@@ -215,7 +215,10 @@ export function EvaluationOverviewSection({
                     tick={{ fontSize: 12 }}
                   />
                   <Tooltip 
-                    formatter={(value) => [`${value > 0 ? '+' : ''}${value}`, 'Score']}
+                    formatter={(value) => {
+                      const numValue = Number(value);
+                      return [`${numValue > 0 ? '+' : ''}${numValue}`, 'Score'];
+                    }}
                     cursor={{ fill: 'transparent' }}
                   />
                   <Bar 
