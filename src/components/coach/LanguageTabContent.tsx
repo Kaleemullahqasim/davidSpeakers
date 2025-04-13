@@ -94,7 +94,7 @@ export function LanguageTabContent({
       toast({
         title: 'Google Gemini Analysis Complete',
         description: 'Your transcript has been successfully analyzed!',
-        variant: 'success',
+        variant: 'default',
       });
       
       // Notify parent component
