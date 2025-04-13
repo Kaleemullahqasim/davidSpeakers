@@ -42,8 +42,8 @@ export function CriticalSkillsTab({ evaluationId, existingCriticalSkills = [] }:
 
   // Get unique categories for dropdown
   const categories = useMemo(() => {
-    const uniqueCategories = [...new Set(allSkills.map(skill => getParentClassForSkill(skill.id)))];
-    return ['All Categories', ...uniqueCategories];
+    const uniqueCategoriesSet = new Set(allSkills.map(skill => getParentClassForSkill(skill.id)));
+    const uniqueCategories = Array.from(uniqueCategoriesSet);
   }, [allSkills]);
 
   // Filter skills based on search, category, and skill type
