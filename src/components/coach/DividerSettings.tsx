@@ -59,7 +59,7 @@ export function DividerSettings({
       toast({
         title: "Cannot Calculate Divider",
         description: "No skill points available to calculate divider.",
-        variant: "warning"
+        variant: "destructive"
       });
       return;
     }
