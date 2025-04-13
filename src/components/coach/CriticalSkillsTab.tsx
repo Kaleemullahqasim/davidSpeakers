@@ -44,6 +44,7 @@ export function CriticalSkillsTab({ evaluationId, existingCriticalSkills = [] }:
   const categories = useMemo(() => {
     const uniqueCategoriesSet = new Set(allSkills.map(skill => getParentClassForSkill(skill.id)));
     const uniqueCategories = Array.from(uniqueCategoriesSet);
+    return ['All Categories', ...uniqueCategories];
   }, [allSkills]);
 
   // Filter skills based on search, category, and skill type
@@ -148,7 +149,7 @@ export function CriticalSkillsTab({ evaluationId, existingCriticalSkills = [] }:
                     onValueChange={(value) => setSelectedCategory(value)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Categories</SelectItem>
@@ -169,7 +170,7 @@ export function CriticalSkillsTab({ evaluationId, existingCriticalSkills = [] }:
                     onValueChange={(value) => setSelectedSkillType(value)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select skill type" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Types</SelectItem>
@@ -204,7 +205,7 @@ export function CriticalSkillsTab({ evaluationId, existingCriticalSkills = [] }:
                         onClick={() => toggleSkill(skill.id.toString())}
                       >
                         <div className="flex items-center">
-                          <Badge variant={skill.isGoodSkill ? "success" : "destructive"} className="mr-2 w-6 h-6 flex items-center justify-center p-1">
+                          <Badge variant={skill.isGoodSkill ? "secondary" : "destructive"} className="mr-2 w-6 h-6 flex items-center justify-center p-1">
                             {skill.isGoodSkill ? <ThumbsUp className="h-3 w-3" /> : <ThumbsDown className="h-3 w-3" />}
                           </Badge>
                           <div>
