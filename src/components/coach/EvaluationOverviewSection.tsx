@@ -33,7 +33,7 @@ export function EvaluationOverviewSection({
   const { toast } = useToast();
 
   // Get total points and calculate scores
-  const maxTotalPoints = evaluation?.results?.skill_scores?.reduce((total, skill) => 
+  const maxTotalPoints = evaluation?.results?.skill_scores?.reduce((total: number, skill) => 
     total + (skill.max_score * skill.weight), 0) || 0;
   
   // Get divider from evaluation data, local state, or calculate it
@@ -50,7 +50,7 @@ export function EvaluationOverviewSection({
     setLocalDivider(newDivider);
     
     // Calculate new final score based on total points
-    const totalPoints = evaluation?.results?.skill_scores?.reduce((total, skill) => {
+    const totalPoints = evaluation?.results?.skill_scores?.reduce((total: number, skill) => {
       const scoreToUse = skill.is_automated 
         ? (skill.adjusted_score !== null ? skill.adjusted_score : skill.actual_score_ai) 
         : skill.actual_score;
