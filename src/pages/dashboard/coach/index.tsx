@@ -74,7 +74,7 @@ export default function CoachDashboard() {
 
   // Activity data for timeline
   const recentActivity = [...(evaluations || [])]
-    .sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime())
+    .sort((a, b) => new Date(b.completed_at || b.created_at).getTime() - new Date(a.completed_at || a.created_at).getTime())
     .slice(0, 5);
 
   // Get the current day of the week (0 = Sunday, 1 = Monday, etc.)
@@ -82,13 +82,13 @@ export default function CoachDashboard() {
   
   // Create a more realistic weekly completion data based on actual completed evaluations
   const weeklyCompletionData = [
-    { name: 'Sun', count: completedEvaluations.filter(e => new Date(e.completed_at || e.created_at).getDay() === 0).length || (today === 0 ? 1 : 0) },
-    { name: 'Mon', count: completedEvaluations.filter(e => new Date(e.completed_at || e.created_at).getDay() === 1).length || (today === 1 ? 1 : 0) },
-    { name: 'Tue', count: completedEvaluations.filter(e => new Date(e.completed_at || e.created_at).getDay() === 2).length || (today === 2 ? 2 : 0) },
-    { name: 'Wed', count: completedEvaluations.filter(e => new Date(e.completed_at || e.created_at).getDay() === 3).length || (today === 3 ? 1 : 0) },
-    { name: 'Thu', count: completedEvaluations.filter(e => new Date(e.completed_at || e.created_at).getDay() === 4).length || (today === 4 ? 3 : 0) },
-    { name: 'Fri', count: completedEvaluations.filter(e => new Date(e.completed_at || e.created_at).getDay() === 5).length || (today === 5 ? 2 : 0) },
-    { name: 'Sat', count: completedEvaluations.filter(e => new Date(e.completed_at || e.created_at).getDay() === 6).length || (today === 6 ? 1 : 0) },
+    { name: 'Sun', count: completedEvaluations.filter((e: any) => new Date(e.completed_at || e.created_at).getDay() === 0).length || (today === 0 ? 1 : 0) },
+    { name: 'Mon', count: completedEvaluations.filter((e: any) => new Date(e.completed_at || e.created_at).getDay() === 1).length || (today === 1 ? 1 : 0) },
+    { name: 'Tue', count: completedEvaluations.filter((e: any) => new Date(e.completed_at || e.created_at).getDay() === 2).length || (today === 2 ? 2 : 0) },
+    { name: 'Wed', count: completedEvaluations.filter((e: any) => new Date(e.completed_at || e.created_at).getDay() === 3).length || (today === 3 ? 1 : 0) },
+    { name: 'Thu', count: completedEvaluations.filter((e: any) => new Date(e.completed_at || e.created_at).getDay() === 4).length || (today === 4 ? 3 : 0) },
+    { name: 'Fri', count: completedEvaluations.filter((e: any) => new Date(e.completed_at || e.created_at).getDay() === 5).length || (today === 5 ? 2 : 0) },
+    { name: 'Sat', count: completedEvaluations.filter((e: any) => new Date(e.completed_at || e.created_at).getDay() === 6).length || (today === 6 ? 1 : 0) },
   ];
 
   // Stats for at-a-glance metrics with improved icons and dynamic counts
@@ -134,15 +134,15 @@ export default function CoachDashboard() {
 
   // Calculate average completion time (more realistic calculation based on evaluation data)
   const completionTimes = completedEvaluations
-    .filter(e => e.completed_at) // Only include evaluations with completion dates
-    .map(e => {
+    .filter((e: any) => e.completed_at) // Only include evaluations with completion dates
+    .map((e: any) => {
       const start = new Date(e.created_at).getTime();
       const end = new Date(e.completed_at as string).getTime();
       return (end - start) / (1000 * 60 * 60 * 24); // Convert to days
     });
   
   const avgCompletionTime = completionTimes.length > 0 
-    ? (completionTimes.reduce((sum, time) => sum + time, 0) / completionTimes.length).toFixed(1) + " days"
+    ? (completionTimes.reduce((sum: any, time: any) => sum + time, 0) / completionTimes.length).toFixed(1) + " days"
     : "1.2 days"; // Fallback value
 
   if (loading || !mounted) {
@@ -456,7 +456,7 @@ export default function CoachDashboard() {
                         </div>
                         <div className="flex items-center">
                           <span className="text-xs text-gray-500 mr-2">
-                            {new Date(activity.updated_at || activity.created_at).toLocaleDateString(undefined, {
+                            {new Date(activity.completed_at || activity.created_at).toLocaleDateString(undefined, {
                               month: 'short',
                               day: 'numeric'
                             })}

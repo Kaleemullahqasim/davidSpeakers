@@ -385,7 +385,7 @@ export default function StudentDashboard() {
                     <CardDescription>Your speech evaluation history</CardDescription>
                   </div>
                   {recentEvaluations.length > 0 && (
-                    <Button variant="outline" size="sm" onClick={() => document.querySelector('[data-value="evaluations"]')?.click()}>
+                    <Button variant="outline" size="sm" onClick={() => (document.querySelector('[data-value="evaluations"]') as HTMLElement)?.click()}>
                       View All
                     </Button>
                   )}
@@ -400,7 +400,7 @@ export default function StudentDashboard() {
                   </div>
                 ) : recentEvaluations.length > 0 ? (
                   <div className="space-y-4">
-                    {recentEvaluations.map(evaluation => (
+                    {recentEvaluations.map((evaluation: any) => (
                       <div key={evaluation.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors flex-wrap sm:flex-nowrap gap-2">
                         <div className="flex items-center gap-3">
                           <div className={`p-2 rounded-full ${
@@ -455,7 +455,7 @@ export default function StudentDashboard() {
                     <p className="text-sm text-gray-600 max-w-sm mx-auto mb-4">
                       Upload your first speech video to get started with your speaking journey.
                     </p>
-                    <Button onClick={() => document.querySelector('[data-value="submit"]')?.click()}>
+                    <Button onClick={() => (document.querySelector('[data-value="submit"]') as HTMLElement)?.click()}>
                       Submit a Video
                     </Button>
                   </div>
@@ -485,7 +485,7 @@ export default function StudentDashboard() {
                   </div>
                 ) : evaluations && evaluations.length > 0 ? (
                   <div className="space-y-4">
-                    {evaluations.map(evaluation => (
+                    {evaluations.map((evaluation: any) => (
                       <div key={evaluation.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border hover:bg-gray-50 transition-colors">
                         <div className="mb-3 sm:mb-0">
                           <div className="flex items-center gap-2 mb-2">
@@ -550,7 +550,7 @@ export default function StudentDashboard() {
                     <p className="text-sm text-gray-600 max-w-sm mx-auto mb-4">
                       You haven't submitted any speech videos yet. Upload a video to get started.
                     </p>
-                    <Button onClick={() => document.querySelector('[data-value="submit"]')?.click()}>
+                    <Button onClick={() => (document.querySelector('[data-value="submit"]') as HTMLElement)?.click()}>
                       Submit Your First Video
                     </Button>
                   </div>
@@ -581,7 +581,7 @@ function generateSkillsData(evaluations: any[]) {
   
   // Get the most recent evaluation with analysis data
   const evaluationsWithAnalysis = evaluations
-    .filter(e => e.results?.analysis)
+    .filter((e: any) => e.results?.analysis)
     .sort((a, b) => new Date(b.completed_at || b.created_at).getTime() - 
                   new Date(a.completed_at || a.created_at).getTime());
   
@@ -640,14 +640,14 @@ function generateProgressData(evaluations: any[]) {
   if (!evaluations || evaluations.length === 0) return [];
   
   const evaluationsWithAnalysis = evaluations
-    .filter(e => e.results?.analysis)
+    .filter((e: any) => e.results?.analysis)
     .sort((a, b) => new Date(a.completed_at || a.created_at).getTime() - 
                   new Date(b.completed_at || b.created_at).getTime());
   
   if (evaluationsWithAnalysis.length === 0) return [];
   
   // Create data points for each evaluation
-  return evaluationsWithAnalysis.map(evaluation => {
+  return evaluationsWithAnalysis.map((evaluation: any) => {
     const analysis = evaluation.results.analysis;
     
     // Calculate average scores by category

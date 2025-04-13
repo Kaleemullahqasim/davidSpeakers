@@ -131,8 +131,8 @@ export function ScoringTable({
   };
 
   // Calculate the total points and display info about the scoring
-  const totalPoints = localSkills.reduce((sum, skill) => sum + skill.points, 0);
-  const maxPoints = localSkills.reduce((sum, skill) => sum + (skill.maxScore * skill.weight), 0);
+  const totalPoints = localSkills.reduce((sum: any, skill: any) => sum + skill.points, 0);
+  const maxPoints = localSkills.reduce((sum: any, skill: any) => sum + (skill.maxScore * skill.weight), 0);
   const percentage = maxPoints ? (totalPoints / maxPoints) * 100 : 0;
 
   return (

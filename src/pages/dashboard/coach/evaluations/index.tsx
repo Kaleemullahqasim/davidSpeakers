@@ -191,7 +191,7 @@ export default function CoachEvaluations() {
                   </div>
                 ) : pendingEvaluations.length > 0 ? (
                   <div className="space-y-4">
-                    {pendingEvaluations.map((evaluation) => (
+                    {pendingEvaluations.map((evaluation: any) => (
                       <div key={evaluation.id} className="flex items-center justify-between border border-blue-100 bg-blue-50 rounded-lg p-4 hover:shadow-md transition-shadow">
                         <div>
                           <h3 className="font-medium">{evaluation.title || `Speech #${evaluation.id.slice(0, 8)}`}</h3>
@@ -253,7 +253,7 @@ export default function CoachEvaluations() {
                   </div>
                 ) : inProgressEvaluations.length > 0 ? (
                   <div className="space-y-4">
-                    {inProgressEvaluations.map((evaluation) => (
+                    {inProgressEvaluations.map((evaluation: any) => (
                       <div key={evaluation.id} className="flex items-center justify-between border border-amber-100 bg-amber-50 rounded-lg p-4 hover:shadow-md transition-shadow">
                         <div>
                           <h3 className="font-medium">{evaluation.title || `Speech #${evaluation.id.slice(0, 8)}`}</h3>
@@ -315,7 +315,7 @@ export default function CoachEvaluations() {
                   </div>
                 ) : completedEvaluations.length > 0 ? (
                   <div className="space-y-4">
-                    {completedEvaluations.map((evaluation) => (
+                    {completedEvaluations.map((evaluation: any) => (
                       <div key={evaluation.id} className="flex items-center justify-between border border-green-100 bg-green-50 rounded-lg p-4 hover:shadow-md transition-shadow">
                         <div>
                           <h3 className="font-medium">{evaluation.title || `Speech #${evaluation.id.slice(0, 8)}`}</h3>

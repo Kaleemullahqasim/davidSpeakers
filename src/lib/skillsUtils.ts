@@ -21,7 +21,7 @@ export function getParentClassForSkill(skillId: number): string {
 export function getSkillsByCategory(scores: any[] = [], category: string): any[] {
   if (!scores || !Array.isArray(scores)) return [];
   
-  return scores.filter(score => {
+  return scores.filter((score: any) => {
     const skillId = score.skill_id;
     const skillCategory = getParentClassForSkill(skillId);
     return skillCategory === category;
@@ -62,7 +62,16 @@ export function getScoreBadgeColorClass(score: number): string {
  * Process skill scores into categories with statistics
  */
 export function calculateCategorySummary(scores: any[]) {
-  const categories = {
+  // Define the type for category data
+  type CategoryData = {
+    score: number;
+    count: number;
+    maxPossible: number;
+    rawPoints: number;
+  };
+
+  // Define categories with proper typing
+  const categories: Record<string, CategoryData> = {
     "Nervousness": { score: 0, count: 0, maxPossible: 0, rawPoints: 0 },
     "Voice": { score: 0, count: 0, maxPossible: 0, rawPoints: 0 },
     "Body Language": { score: 0, count: 0, maxPossible: 0, rawPoints: 0 },
@@ -74,7 +83,7 @@ export function calculateCategorySummary(scores: any[]) {
   if (!scores || !Array.isArray(scores)) return categories;
   
   // Process all scores by category
-  scores.forEach(score => {
+  scores.forEach((score: any) => {
     const category = getParentClassForSkill(score.skill_id);
     
     if (categories[category]) {
@@ -97,7 +106,7 @@ export function calculateCategorySummary(scores: any[]) {
   });
   
   // Calculate percentage scores for each category
-  Object.keys(categories).forEach(category => {
+  Object.keys(categories).forEach((category: any) => {
     const data = categories[category];
     if (data.maxPossible > 0) {
       data.score = Math.round((data.rawPoints / data.maxPossible) * 100);

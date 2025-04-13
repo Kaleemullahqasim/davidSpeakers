@@ -168,7 +168,7 @@ function EvaluationDetail() {
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <span>Completed: {new Date(evaluation.completed_at || Date.now()).toLocaleDateString()}</span>
               <span>•</span>
-              <Badge variant="success">
+              <Badge variant="secondary">
                 Completed
               </Badge>
             </div>

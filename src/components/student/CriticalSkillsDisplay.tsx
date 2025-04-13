@@ -31,8 +31,8 @@ export function CriticalSkillsDisplay({ criticalSkills }: CriticalSkillsDisplayP
 
   // Get skill details for the critical skills
   const criticalSkillDetails = criticalSkills
-    .map(skillId => {
-      const skill = allSkills.find(s => s.id.toString() === skillId);
+    .map((skillId: any) => {
+      const skill = allSkills.find((s: any) => s.id.toString() === skillId);
       return skill ? {
         id: skill.id,
         name: skill.name,
@@ -40,11 +40,11 @@ export function CriticalSkillsDisplay({ criticalSkills }: CriticalSkillsDisplayP
         category: getSkillCategory(skill.id)
       } : null;
     })
-    .filter(skill => skill !== null);
+    .filter((skill: any) => skill !== null);
 
   // Separate good and bad skills
-  const goodSkills = criticalSkillDetails.filter(skill => skill?.isGoodSkill);
-  const badSkills = criticalSkillDetails.filter(skill => !skill?.isGoodSkill);
+  const goodSkills = criticalSkillDetails.filter((skill: any) => skill?.isGoodSkill);
+  const badSkills = criticalSkillDetails.filter((skill: any) => !skill?.isGoodSkill);
 
   return (
     <Card className="mb-6">
@@ -65,7 +65,7 @@ export function CriticalSkillsDisplay({ criticalSkills }: CriticalSkillsDisplayP
               <p className="text-gray-500 italic">No strengths highlighted</p>
             ) : (
               <ul className="space-y-2">
-                {goodSkills.map(skill => (
+                {goodSkills.map((skill: any) => (
                   <li key={skill?.id} className="flex items-start">
                     <CheckCircle2 className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
                     <div>
@@ -87,7 +87,7 @@ export function CriticalSkillsDisplay({ criticalSkills }: CriticalSkillsDisplayP
               <p className="text-gray-500 italic">No areas for improvement highlighted</p>
             ) : (
               <ul className="space-y-2">
-                {badSkills.map(skill => (
+                {badSkills.map((skill: any) => (
                   <li key={skill?.id} className="flex items-start">
                     <XCircle className="h-5 w-5 text-amber-500 mr-2 mt-0.5 flex-shrink-0" />
                     <div>

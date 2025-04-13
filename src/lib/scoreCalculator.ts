@@ -21,7 +21,7 @@ export interface ParentClassScore {
  * Uses actual score for manual skills
  */
 export function calculateTotalPoints(skills: SkillScore[]): number {
-  const total = skills.reduce((sum, skill) => {
+  const total = skills.reduce((sum: any, skill: any) => {
     // For automated skills, use adjustedScore if available, otherwise use AI score
     // For manual skills, use actualScore
     const scoreToUse = skill.isAutomated 
@@ -45,7 +45,7 @@ export function calculateTotalPoints(skills: SkillScore[]): number {
  * This multiplies each skill's max score by its weight
  */
 export function calculateMaxPoints(skills: SkillScore[]): number {
-  const total = skills.reduce((sum, skill) => sum + (skill.maxScore * skill.weight), 0);
+  const total = skills.reduce((sum: any, skill: any) => sum + (skill.maxScore * skill.weight), 0);
   console.log(`Max points calculated: ${total.toFixed(2)} from ${skills.length} skills`);
   return total;
 }

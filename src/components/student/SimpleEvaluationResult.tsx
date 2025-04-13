@@ -243,7 +243,7 @@ function formatCategoryName(category: string) {
     .replace(/_/g, ' ')
     .replace(/([A-Z])/g, ' $1')
     .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .map((word: any) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ')
     .trim();
 }
@@ -394,7 +394,7 @@ function calculateCategoryScores(evaluation: any, skillScores: any[], defaults: 
   };
   
   // Group scores by category
-  skillScores.forEach(skill => {
+  skillScores.forEach((skill: any) => {
     // Normalize category name
     let category = skill?.category?.toLowerCase().replace(/\s+/g, '_');
     
@@ -426,7 +426,7 @@ function calculateCategoryScores(evaluation: any, skillScores: any[], defaults: 
   // APPROACH 3: If we have a final score but no category data, use a scaled version of the final score
   if (evaluation?.results?.final_score) {
     const baseScore = evaluation.results.final_score * 0.8;  // 80% of final score
-    Object.keys(result).forEach(key => {
+    Object.keys(result).forEach((key: any) => {
       // Add some variation to make it look more natural
       const randomFactor = 0.9 + Math.random() * 0.2;  // 0.9 to 1.1
       result[key as keyof typeof result] = Math.max(40, baseScore * randomFactor);

@@ -210,8 +210,8 @@ export default function AdminEvaluationDetail() {
   // Get coach name from the nested coach object or coaches array
   const coachName = evaluation.coach?.name || 
                    evaluation.coach?.email || 
-                   coaches.find(c => c.id === evaluation.coach_id)?.name || 
-                   coaches.find(c => c.id === evaluation.coach_id)?.email || 
+                   coaches.find((c: any) => c.id === evaluation.coach_id)?.name || 
+                   coaches.find((c: any) => c.id === evaluation.coach_id)?.email || 
                    'Unknown Coach';
 
   // Transform analysis data for the chart
@@ -459,7 +459,7 @@ export default function AdminEvaluationDetail() {
 // Helper functions
 function formatSkillName(skill: string): string {
   return skill.split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word: any) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 }
 

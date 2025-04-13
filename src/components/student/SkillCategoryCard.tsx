@@ -18,7 +18,7 @@ export function SkillCategoryCard({ title, skills = [], scores = [], showDescrip
   const [debugVisible, setDebugVisible] = useState(false);
   
   // Get scores specific to this category
-  const categoryScores = scores.filter(score => {
+  const categoryScores = scores.filter((score: any) => {
     if (!score || !score.skill_id) return false;
     const category = getParentClassForSkill(score.skill_id);
     return category === title;
@@ -36,7 +36,7 @@ export function SkillCategoryCard({ title, skills = [], scores = [], showDescrip
   // 1. Array of skill objects
   // 2. Array of skill IDs
   // We need to handle both cases
-  const skillsToProcess = skills.map(skill => {
+  const skillsToProcess = skills.map((skill: any) => {
     if (typeof skill === 'object' && skill !== null) {
       return skill;
     } else {
@@ -46,9 +46,9 @@ export function SkillCategoryCard({ title, skills = [], scores = [], showDescrip
   });
   
   // Match each skill with its score
-  const scoredSkills = skillsToProcess.map(skill => {
+  const scoredSkills = skillsToProcess.map((skill: any) => {
     const skillId = skill.id || skill.skill_id;
-    const scoreData = categoryScores.find(s => s.skill_id === skillId);
+    const scoreData = categoryScores.find((s: any) => s.skill_id === skillId);
     
     // Get score value with fallbacks
     const scoreValue = scoreData 
@@ -75,14 +75,14 @@ export function SkillCategoryCard({ title, skills = [], scores = [], showDescrip
   });
   
   // Skills that actually have scores
-  const skillsWithScores = scoredSkills.filter(s => s.hasScore);
+  const skillsWithScores = scoredSkills.filter((s: any) => s.hasScore);
   
   // Calculate totals
-  const totalRawPoints = skillsWithScores.reduce((sum, skill) => {
+  const totalRawPoints = skillsWithScores.reduce((sum: any, skill: any) => {
     return sum + (skill.scoreValue * skill.weight);
   }, 0);
   
-  const maxPossiblePoints = skillsWithScores.reduce((sum, skill) => {
+  const maxPossiblePoints = skillsWithScores.reduce((sum: any, skill: any) => {
     const maxVal = skill.isGoodSkill ? skill.maxScore : 0;
     return sum + (maxVal * skill.weight);
   }, 0);

@@ -21,8 +21,8 @@ export function StrengthsImprovementsCard({ criticalSkills, expanded = false }: 
   
   // Get skill details for the critical skills
   const criticalSkillDetails = criticalSkills
-    .map(skillId => {
-      const skill = allSkills.find(s => s.id.toString() === skillId);
+    .map((skillId: any) => {
+      const skill = allSkills.find((s: any) => s.id.toString() === skillId);
       return skill ? {
         id: skill.id,
         name: skill.name,
@@ -30,11 +30,11 @@ export function StrengthsImprovementsCard({ criticalSkills, expanded = false }: 
         category: getParentClassForSkill(skill.id)
       } : null;
     })
-    .filter(skill => skill !== null);
+    .filter((skill: any) => skill !== null);
 
   // Separate good and bad skills
-  const strengths = criticalSkillDetails.filter(skill => skill?.isGoodSkill);
-  const improvements = criticalSkillDetails.filter(skill => !skill?.isGoodSkill);
+  const strengths = criticalSkillDetails.filter((skill: any) => skill?.isGoodSkill);
+  const improvements = criticalSkillDetails.filter((skill: any) => !skill?.isGoodSkill);
 
   return (
     <Card className="mb-6">

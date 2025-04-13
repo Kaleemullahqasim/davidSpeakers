@@ -51,8 +51,13 @@ export function StudentScoreSummary({ evaluation }: StudentScoreSummaryProps) {
         const skillScores = evaluation.results.skill_scores;
         
         // Group skills by category
-        const scoresByCategory = {};
-        skillScores.forEach(score => {
+        const scoresByCategory: Record<string, {
+          score: number;
+          count: number;
+          maxPossible: number;
+          rawPoints: number;
+        }> = {};
+        skillScores.forEach((score: any) => {
           const category = getParentClassForSkill(score.skill_id);
           if (!scoresByCategory[category]) {
             scoresByCategory[category] = { 
@@ -77,7 +82,7 @@ export function StudentScoreSummary({ evaluation }: StudentScoreSummaryProps) {
         });
         
         // Calculate percentage scores for each category
-        Object.keys(scoresByCategory).forEach(category => {
+        Object.keys(scoresByCategory).forEach((category: any) => {
           const categoryData = scoresByCategory[category];
           if (categoryData.maxPossible > 0) {
             categoryData.score = (categoryData.rawPoints / categoryData.maxPossible) * 100;

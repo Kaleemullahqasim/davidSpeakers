@@ -243,9 +243,16 @@ export default function AdminAnalytics() {
                     <Tooltip />
                     <Bar 
                       dataKey="score" 
-                      fill={(entry) => entry.score > 0 ? '#10b981' : '#ef4444'}
+                      fill="#10b981"
                       radius={[0, 4, 4, 0]}
-                    />
+                    >
+                      {skillPerformanceData.map((entry, index) => (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={entry.score > 0 ? '#10b981' : '#ef4444'} 
+                        />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>

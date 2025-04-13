@@ -64,8 +64,8 @@ export function ManualScoringTable({
           const data = await response.json();
           if (data.scores && data.scores.length > 0) {
             // Use existing scores if available
-            const mappedSkills: Skill[] = skills.map(skill => {
-              const existingScore = data.scores.find(s => s.skill_id === skill.id);
+            const mappedSkills: Skill[] = skills.map((skill: any) => {
+              const existingScore = data.scores.find((s: any) => s.skill_id === skill.id);
               return {
                 id: skill.id,
                 name: skill.name,
@@ -80,7 +80,7 @@ export function ManualScoringTable({
             setSkills(mappedSkills);
           } else {
             // Use defaults if no scores found
-            const mappedSkills: Skill[] = skills.map(skill => ({
+            const mappedSkills: Skill[] = skills.map((skill: any) => ({
               id: skill.id,
               name: skill.name,
               maxScore: skill.maxScore,
@@ -98,7 +98,7 @@ export function ManualScoringTable({
       } catch (error) {
         console.error('Error fetching existing scores:', error);
         // Fallback to default scores
-        const mappedSkills: Skill[] = skills.map(skill => ({
+        const mappedSkills: Skill[] = skills.map((skill: any) => ({
           id: skill.id,
           name: skill.name,
           maxScore: skill.maxScore,
@@ -115,7 +115,10 @@ export function ManualScoringTable({
     };
     
     fetchExistingScores();
-    
+  }, [skillType, evaluationId]);
+
+  // Separate useEffect for cleanup that depends on the state 'skills'
+  useEffect(() => {
     return () => {
       // Clean up the timeout on unmount
       if (autoSaveTimeoutId) {
@@ -127,7 +130,8 @@ export function ManualScoringTable({
         }
       }
     };
-  }, [skillType, evaluationId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSaveTimeoutId, hasUnsavedChanges, skills]);
 
   // Handle saving the scores
   const handleSave = async (updatedSkills: Skill[]) => {
@@ -139,7 +143,7 @@ export function ManualScoringTable({
         method: 'POST',
         body: JSON.stringify({
           evaluationId,
-          skills: updatedSkills.map(skill => ({
+          skills: updatedSkills.map((skill: any) => ({
             skill_id: skill.id,
             max_score: skill.maxScore,
             weight: skill.weight,

@@ -65,7 +65,7 @@ export default function CoachResources() {
           </CardHeader>
           <CardContent>
             <Accordion type="single" collapsible className="w-full">
-              {resources.map((resource) => (
+              {resources.map((resource: any) => (
                 <AccordionItem key={resource.id} value={resource.id}>
                   <AccordionTrigger className="font-medium">{resource.title}</AccordionTrigger>
                   <AccordionContent>

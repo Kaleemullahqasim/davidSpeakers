@@ -42,14 +42,14 @@ export function CriticalSkillsTab({ evaluationId, existingCriticalSkills = [] }:
 
   // Get unique categories for dropdown
   const categories = useMemo(() => {
-    const uniqueCategoriesSet = new Set(allSkills.map(skill => getParentClassForSkill(skill.id)));
+    const uniqueCategoriesSet = new Set(allSkills.map((skill: any) => getParentClassForSkill(skill.id)));
     const uniqueCategories = Array.from(uniqueCategoriesSet);
     return ['All Categories', ...uniqueCategories];
   }, [allSkills]);
 
   // Filter skills based on search, category, and skill type
   const filteredSkills = useMemo(() => {
-    return allSkills.filter(skill => {
+    return allSkills.filter((skill: any) => {
       const skillName = skill.name.toLowerCase();
       const searchMatch = !searchTerm || skillName.includes(searchTerm.toLowerCase());
       
@@ -66,8 +66,8 @@ export function CriticalSkillsTab({ evaluationId, existingCriticalSkills = [] }:
 
   // Separate selected skills into strengths and areas for improvement
   const selectedSkillDetails = useMemo(() => {
-    return selectedSkills.map(skillId => {
-      const skill = allSkills.find(s => s.id.toString() === skillId);
+    return selectedSkills.map((skillId: any) => {
+      const skill = allSkills.find((s: any) => s.id.toString() === skillId);
       return skill ? {
         id: skill.id.toString(),
         name: skill.name,
@@ -78,17 +78,17 @@ export function CriticalSkillsTab({ evaluationId, existingCriticalSkills = [] }:
   }, [selectedSkills, allSkills]);
 
   const strengths = useMemo(() => 
-    selectedSkillDetails.filter(skill => skill?.isGoodSkill)
+    selectedSkillDetails.filter((skill: any) => skill?.isGoodSkill)
   , [selectedSkillDetails]);
   
   const areasForImprovement = useMemo(() => 
-    selectedSkillDetails.filter(skill => !skill?.isGoodSkill)
+    selectedSkillDetails.filter((skill: any) => !skill?.isGoodSkill)
   , [selectedSkillDetails]);
 
   const toggleSkill = (skillId: string) => {
     setSelectedSkills(prev => {
       if (prev.includes(skillId)) {
-        return prev.filter(id => id !== skillId);
+        return prev.filter((id: any) => id !== skillId);
       } else {
         return [...prev, skillId];
       }
@@ -153,7 +153,7 @@ export function CriticalSkillsTab({ evaluationId, existingCriticalSkills = [] }:
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Categories</SelectItem>
-                      {categories.map(category => 
+                      {categories.map((category: any) => 
                         category !== 'All Categories' && (
                           <SelectItem key={category} value={category.toLowerCase()}>
                             {category}
@@ -194,7 +194,7 @@ export function CriticalSkillsTab({ evaluationId, existingCriticalSkills = [] }:
               <div className="h-[400px] border rounded-md p-2 overflow-y-auto">
                 <div className="space-y-1">
                   {filteredSkills.length > 0 ? (
-                    filteredSkills.map(skill => (
+                    filteredSkills.map((skill: any) => (
                       <div 
                         key={skill.id}
                         className={`
@@ -253,7 +253,7 @@ export function CriticalSkillsTab({ evaluationId, existingCriticalSkills = [] }:
                     ) : (
                       <div className="h-[150px] overflow-y-auto">
                         <div className="space-y-1">
-                          {strengths.map(skill => (
+                          {strengths.map((skill: any) => (
                             <div key={skill?.id} className="flex justify-between items-center p-2 text-sm hover:bg-gray-100 rounded-md">
                               <div>
                                 <span>{skill?.name}</span>
@@ -288,7 +288,7 @@ export function CriticalSkillsTab({ evaluationId, existingCriticalSkills = [] }:
                     ) : (
                       <div className="h-[150px] overflow-y-auto">
                         <div className="space-y-1">
-                          {areasForImprovement.map(skill => (
+                          {areasForImprovement.map((skill: any) => (
                             <div key={skill?.id} className="flex justify-between items-center p-2 text-sm hover:bg-gray-100 rounded-md">
                               <div>
                                 <span>{skill?.name}</span>

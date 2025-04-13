@@ -57,7 +57,7 @@ export function AIScoreTable({ evaluationId, aiAnalysis }: AIScoreTableProps) {
     
     try {
       // Format the skills data for the API
-      const formattedSkills = skills.map(skill => ({
+      const formattedSkills = skills.map((skill: any) => ({
         skill_id: skill.id,
         max_score: skill.maxScore,
         weight: skill.weight,
@@ -103,7 +103,7 @@ export function AIScoreTable({ evaluationId, aiAnalysis }: AIScoreTableProps) {
     // Track changes to notify parent component
     const newAdjustedScores = { ...adjustedScores };
     
-    skills.forEach(skill => {
+    skills.forEach((skill: any) => {
       if (skill.adjustedScore !== undefined) {
         newAdjustedScores[skill.id] = skill.adjustedScore;
       }
@@ -117,7 +117,7 @@ export function AIScoreTable({ evaluationId, aiAnalysis }: AIScoreTableProps) {
   const analyzedSkills = Object.values(aiScores);
   
   // Get all language skills defined in the system
-  const allLanguageSkills = languageSkills.map(skill => {
+  const allLanguageSkills = languageSkills.map((skill: any) => {
     // If we have AI analysis for this skill, use those values
     const aiData = aiScores[skill.id];
     

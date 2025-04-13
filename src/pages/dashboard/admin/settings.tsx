@@ -117,7 +117,7 @@ export default function AdminSettings() {
                       <div key={category} className="space-y-4">
                         <h3 className="font-medium text-lg capitalize">{category.replace('_', ' ')}</h3>
                         <div className="space-y-6">
-                          {categorySkills.map((skill) => (
+                          {(categorySkills as any[]).map((skill: any) => (
                             <div key={skill.id} className="space-y-2">
                               <div className="flex justify-between">
                                 <Label>{skill.name.replace('_', ' ')}</Label>
@@ -177,7 +177,7 @@ export default function AdminSettings() {
                 ) : skills?.length ? (
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {skills.map((skill) => (
+                      {skills.map((skill: any) => (
                         <Button
                           key={skill.id}
                           variant={selectedSkill === skill.id ? 'default' : 'outline'}
@@ -194,7 +194,7 @@ export default function AdminSettings() {
                     {selectedSkill && (
                       <div className="space-y-4">
                         <h3 className="font-medium text-lg">
-                          {skills.find(s => s.id === selectedSkill)?.name.replace('_', ' ')} Thresholds
+                          {skills.find((s: any) => s.id === selectedSkill)?.name.replace('_', ' ')} Thresholds
                         </h3>
                         
                         {rulesLoading ? (
@@ -207,7 +207,7 @@ export default function AdminSettings() {
                               <div className="col-span-2">Actions</div>
                             </div>
                             
-                            {scoringRules.map((rule) => (
+                            {scoringRules.map((rule: any) => (
                               <div key={rule.id} className="grid grid-cols-12 gap-4 items-center border p-2 rounded-md">
                                 <div className="col-span-5 flex items-center gap-2">
                                   <Input
@@ -315,8 +315,8 @@ export default function AdminSettings() {
 }
 
 // Helper function to group skills by category
-function groupByCategory(skills: any[]) {
-  return skills.reduce((acc, skill) => {
+function groupByCategory(skills: any[]): Record<string, any[]> {
+  return skills.reduce((acc: Record<string, any[]>, skill: any) => {
     if (!acc[skill.category]) {
       acc[skill.category] = [];
     }

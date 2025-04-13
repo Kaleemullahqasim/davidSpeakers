@@ -8,7 +8,7 @@ export function extractSkillsByCategory(scores: any[] = [], category: string): a
     return [];
   }
   
-  return scores.filter(score => {
+  return scores.filter((score: any) => {
     if (!score || !score.skill_id) return false;
     const skillCategory = getParentClassForSkill(score.skill_id);
     return skillCategory === category;

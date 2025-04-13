@@ -18,8 +18,8 @@ export function CriticalSkillsList({ criticalSkills }: CriticalSkillsListProps) 
   const strengths: any[] = [];
   const improvementAreas: any[] = [];
   
-  criticalSkills.forEach(skillId => {
-    const skill = allSkills.find(s => s.id.toString() === skillId);
+  criticalSkills.forEach((skillId: any) => {
+    const skill = allSkills.find((s: any) => s.id.toString() === skillId);
     if (skill) {
       if (skill.isGoodSkill) {
         strengths.push(skill);
@@ -46,7 +46,7 @@ export function CriticalSkillsList({ criticalSkills }: CriticalSkillsListProps) 
             
             {strengths.length > 0 ? (
               <ul className="space-y-2">
-                {strengths.map(skill => (
+                {strengths.map((skill: any) => (
                   <li key={skill.id} className="flex items-start gap-2">
                     <Badge variant="outline" className="mt-0.5 bg-green-50 text-green-700 border-green-200">
                       {getParentClassForSkill(skill.id)}
@@ -69,7 +69,7 @@ export function CriticalSkillsList({ criticalSkills }: CriticalSkillsListProps) 
             
             {improvementAreas.length > 0 ? (
               <ul className="space-y-2">
-                {improvementAreas.map(skill => (
+                {improvementAreas.map((skill: any) => (
                   <li key={skill.id} className="flex items-start gap-2">
                     <Badge variant="outline" className="mt-0.5 bg-amber-50 text-amber-700 border-amber-200">
                       {getParentClassForSkill(skill.id)}

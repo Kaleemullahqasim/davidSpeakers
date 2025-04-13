@@ -56,7 +56,7 @@ export default function CoachStudents() {
               </div>
             ) : students && students.length > 0 ? (
               <div className="space-y-4">
-                {students.map((student) => (
+                {students.map((student: any) => (
                   <div key={student.id} className="flex items-center justify-between border-b pb-4">
                     <div>
                       <h3 className="font-medium">{student.name}</h3>

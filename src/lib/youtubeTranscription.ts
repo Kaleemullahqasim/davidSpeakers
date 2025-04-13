@@ -22,7 +22,7 @@ export async function getYouTubeTranscript(videoId: string): Promise<string | nu
     
     // Combine all segments into a single text
     const fullTranscript = transcriptSegments
-      .map(segment => segment.text)
+      .map((segment: any) => segment.text)
       .join(' ')
       .replace(/\s+/g, ' ') // Replace multiple spaces with single space
       .trim();

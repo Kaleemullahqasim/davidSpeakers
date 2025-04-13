@@ -30,7 +30,7 @@ export function ParentClassSummary({
   const handleDividerChange = (newDivider: number) => {
     setCustomDivider(newDivider);
     // Recalculate final score
-    const totalPoints = parentClasses.reduce((sum, pc) => sum + pc.totalPoints, 0);
+    const totalPoints = parentClasses.reduce((sum: any, pc: any) => sum + pc.totalPoints, 0);
     const newFinalScore = newDivider > 0 ? totalPoints / newDivider : 0;
     setCustomFinalScore(newFinalScore);
   };
@@ -70,7 +70,7 @@ export function ParentClassSummary({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {parentClasses.map((parentClass) => (
+              {parentClasses.map((parentClass: any) => (
                 <TableRow key={parentClass.name}>
                   <TableCell className="font-medium">{parentClass.name}</TableCell>
                   <TableCell className="text-right">{parentClass.skillCount}</TableCell>
@@ -86,17 +86,17 @@ export function ParentClassSummary({
               <TableRow className="bg-muted/50">
                 <TableCell className="font-bold">Total</TableCell>
                 <TableCell className="text-right font-bold">
-                  {parentClasses.reduce((sum, pc) => sum + pc.skillCount, 0)}
+                  {parentClasses.reduce((sum: any, pc: any) => sum + pc.skillCount, 0)}
                 </TableCell>
                 <TableCell className="text-right font-bold">
-                  {parentClasses.reduce((sum, pc) => sum + pc.totalPoints, 0).toFixed(2)}
+                  {parentClasses.reduce((sum: any, pc: any) => sum + pc.totalPoints, 0).toFixed(2)}
                 </TableCell>
                 <TableCell className="text-right font-bold">
                   {maxTotalScore.toFixed(2)}
                 </TableCell>
                 <TableCell className="text-right font-bold">
                   {maxTotalScore > 0 
-                    ? `${((parentClasses.reduce((sum, pc) => sum + pc.totalPoints, 0) / maxTotalScore) * 100).toFixed(1)}%` 
+                    ? `${((parentClasses.reduce((sum: any, pc: any) => sum + pc.totalPoints, 0) / maxTotalScore) * 100).toFixed(1)}%` 
                     : 'N/A'}
                 </TableCell>
               </TableRow>
@@ -124,7 +124,7 @@ export function ParentClassSummary({
                 <span className="text-lg text-gray-500"> / 110</span>
               </div>
               <div className="text-sm text-gray-600">
-                {parentClasses.reduce((sum, pc) => sum + pc.totalPoints, 0).toFixed(2)} ÷ {customDivider.toFixed(4)} = {customFinalScore.toFixed(1)}
+                {parentClasses.reduce((sum: any, pc: any) => sum + pc.totalPoints, 0).toFixed(2)} ÷ {customDivider.toFixed(4)} = {customFinalScore.toFixed(1)}
               </div>
             </div>
           </div>

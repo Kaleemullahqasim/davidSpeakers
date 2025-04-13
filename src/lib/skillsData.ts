@@ -175,24 +175,24 @@ export function getSkillById(skillId: number | string): SkillDefinition | null {
   
   // Find the skill in the appropriate skills array
   if (id >= 1 && id <= 6) {
-    return nervousnessSkills.find(skill => skill.id === id) || null;
+    return nervousnessSkills.find((skill: any) => skill.id === id) || null;
   }
   if (id >= 7 && id <= 32) {
-    return voiceSkills.find(skill => skill.id === id) || null;
+    return voiceSkills.find((skill: any) => skill.id === id) || null;
   }
   if (id >= 33 && id <= 75) {
-    return bodyLanguageSkills.find(skill => skill.id === id) || null;
+    return bodyLanguageSkills.find((skill: any) => skill.id === id) || null;
   }
   if (id >= 76 && id <= 84) {
-    return expressionsSkills.find(skill => skill.id === id) || null;
+    return expressionsSkills.find((skill: any) => skill.id === id) || null;
   }
   if (id >= 85 && id <= 102) {
-    return languageSkills.find(skill => skill.id === id) || null;
+    return languageSkills.find((skill: any) => skill.id === id) || null;
   }
   if (id >= 103 && id <= 110) {
-    return ultimateLevelSkills.find(skill => skill.id === id) || null;
+    return ultimateLevelSkills.find((skill: any) => skill.id === id) || null;
   }
   
   // Try searching through all skills as a fallback
-  return getAllSkills().find(skill => skill.id === id) || null;
+  return getAllSkills().find((skill: any) => skill.id === id) || null;
 }

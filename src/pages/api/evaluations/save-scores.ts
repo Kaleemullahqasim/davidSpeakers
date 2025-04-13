@@ -39,7 +39,7 @@ export default async function handler(
     console.log(`Saving scores for evaluation ${evaluationId}:`, {
       skillCount: skills.length,
       hasAutomatedSkills: skills.some(s => s.is_automated),
-      skillIds: skills.map(s => s.skill_id)
+      skillIds: skills.map((s: any) => s.skill_id)
     });
     
     // Get the authorization header to verify identity
@@ -84,7 +84,7 @@ export default async function handler(
     }
     
     // Check if any skills have the skill_id missing
-    const invalidSkills = skills.filter(skill => !skill.skill_id);
+    const invalidSkills = skills.filter((skill: any) => !skill.skill_id);
     if (invalidSkills.length > 0) {
       console.error('Invalid skills without skill_id:', invalidSkills);
       return res.status(400).json({ 
@@ -94,7 +94,7 @@ export default async function handler(
     }
     
     // Extract the skill IDs being updated
-    const skillIdsToUpdate = skills.map(skill => skill.skill_id);
+    const skillIdsToUpdate = skills.map((skill: any) => skill.skill_id);
     
     try {
       // Begin a transaction for consistency
@@ -124,7 +124,7 @@ export default async function handler(
         }
         
         // Format the skills for insertion
-        const skillScores = skills.map(skill => ({
+        const skillScores = skills.map((skill: any) => ({
           evaluation_id: evaluationId,
           skill_id: skill.skill_id,
           max_score: skill.max_score,
@@ -181,7 +181,7 @@ export default async function handler(
       let maxPotentialPoints = 0;
       
       // Process all scores (both new and existing)
-      (allScores || []).forEach(score => {
+      (allScores || []).forEach((score: any) => {
         const scoreToUse = score.adjusted_score !== null && score.adjusted_score !== undefined 
           ? score.adjusted_score 
           : score.actual_score;
@@ -214,12 +214,12 @@ export default async function handler(
       }
       
       // Group scores by category for better logging
-      const scoresByCategory = {};
-      const rawPointsByCategory = {};
-      const maxPossibleByCategory = {};
-      const countsByCategory = {};
+      const scoresByCategory: Record<string, { count: number, points: number, maxPossible: number }> = {};
+      const rawPointsByCategory: Record<string, number> = {};
+      const maxPossibleByCategory: Record<string, number> = {};
+      const countsByCategory: Record<string, number> = {};
 
-      (allScores || []).forEach(score => {
+      (allScores || []).forEach((score: any) => {
         const category = getParentClassForSkill(score.skill_id);
         if (!scoresByCategory[category]) {
           scoresByCategory[category] = { count: 0, points: 0, maxPossible: 0 };
@@ -249,8 +249,8 @@ export default async function handler(
       });
 
       // Calculate percentages for each category
-      const categoriesSummary = {};
-      Object.keys(scoresByCategory).forEach(category => {
+      const categoriesSummary: Record<string, { score: number, count: number, rawPoints: number, maxPossible: number}> = {};
+      Object.keys(scoresByCategory).forEach((category: any) => {
         const data = scoresByCategory[category];
         const percentage = data.maxPossible > 0 ? (data.points / data.maxPossible) * 100 : 0;
         

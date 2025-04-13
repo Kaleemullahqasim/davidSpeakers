@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 import { fetchWithAuth } from '@/lib/auth-helpers';
+import { getAuthToken } from './auth-helpers';
 
 // Types
 export interface User {

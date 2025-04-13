@@ -190,13 +190,13 @@ function mapAiResultsToLanguageSkills(analysisData: any) {
   };
   
   // Create a new analysis object with skill IDs for compatibility with our system
-  const mappedAnalysis = { analysis: {} };
+  const mappedAnalysis: { analysis: Record<string, any> } = { analysis: {} };
   
   // Map the API skills to our system
   Object.entries(analysisData.analysis).forEach(([key, value]: [string, any]) => {
     if (skillMapping[key]) {
       // Find the corresponding skill name from our languageSkills array
-      const skill = languageSkills.find(s => s.id === skillMapping[key]);
+      const skill = languageSkills.find((s: any) => s.id === skillMapping[key]);
       if (skill) {
         // Adjust scores for negative skills
         if (!skill.isGoodSkill && value.score > 0) {

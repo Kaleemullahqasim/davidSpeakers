@@ -53,7 +53,7 @@ export function CriticalSkillsSelector({
     if (isCompleted) return;
     
     if (selectedSkills.includes(skillId)) {
-      onChange(selectedSkills.filter(id => id !== skillId));
+      onChange(selectedSkills.filter((id: any) => id !== skillId));
     } else {
       onChange([...selectedSkills, skillId]);
     }
@@ -94,7 +94,7 @@ export function CriticalSkillsSelector({
             >
               {formatCategoryName(category)}
               <Badge variant="outline" className="bg-gray-100">
-                {selectedSkills.filter(id => 
+                {selectedSkills.filter((id: any) => 
                   skills.some(skill => skill.id === id)
                 ).length} selected
               </Badge>
@@ -103,7 +103,7 @@ export function CriticalSkillsSelector({
             {expandedCategory === category && (
               <div className="p-4 border-t bg-gray-50">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {skills.map(skill => (
+                  {skills.map((skill: any) => (
                     <div key={skill.id} className="flex items-center space-x-2">
                       <Checkbox
                         id={skill.id}
@@ -130,10 +130,10 @@ export function CriticalSkillsSelector({
           <p className="text-sm text-gray-600 mb-2">Selected focus areas ({selectedSkills.length}):</p>
           {selectedSkills.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              {selectedSkills.map(id => {
+              {selectedSkills.map((id: any) => {
                 const skill = Object.values(skillCategories)
                   .flat()
-                  .find(s => s.id === id);
+                  .find((s: any) => s.id === id);
                 return (
                   <Badge key={id} variant="secondary" className="bg-amber-100 text-amber-800">
                     {skill?.label || id}

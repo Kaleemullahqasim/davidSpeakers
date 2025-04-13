@@ -34,14 +34,21 @@ export default function AdminDashboard() {
     queryKey: ['students'],
     queryFn: fetchStudentUsers,
     enabled: !!user?.id && user?.role === 'admin',
-    onSuccess: (data) => {
-      console.log('Students loaded successfully:', data);
-    },
-    onError: (error) => {
-      console.error('Error loading students:', error);
-    },
     retry: 3
   });
+
+  // Add useEffect hooks for success and error handling
+  useEffect(() => {
+    if (students) {
+      console.log('Students loaded successfully:', students);
+    }
+  }, [students]);
+
+  useEffect(() => {
+    if (studentsError) {
+      console.error('Error loading students:', studentsError);
+    }
+  }, [studentsError]);
 
   // Fetch all evaluations
   const { 
@@ -110,7 +117,7 @@ export default function AdminDashboard() {
   const effectiveStudents = students?.length ? students : directStudents;
 
   // Calculate pending coach approvals
-  const pendingCoachApprovals = coaches?.filter(coach => !coach.approved).length || 0;
+  const pendingCoachApprovals = coaches?.filter((coach: any) => !coach.approved).length || 0;
   
   // User distribution data for chart
   const userDistributionData = [
@@ -121,7 +128,7 @@ export default function AdminDashboard() {
     },
     {
       name: 'Coaches',
-      value: coaches?.filter(coach => coach.approved).length || 0,
+      value: coaches?.filter((coach: any) => coach.approved).length || 0,
       color: '#10b981'
     },
     {
@@ -265,7 +272,7 @@ export default function AdminDashboard() {
               </div>
             ) : allEvaluations && allEvaluations.length > 0 ? (
               <div className="space-y-4">
-                {allEvaluations.map((evaluation) => (
+                {allEvaluations.map((evaluation: any) => (
                   <div key={evaluation.id} className="flex items-center justify-between border-b pb-4">
                     <div>
                       <h3 className="font-medium">{evaluation.title || `Evaluation #${evaluation.id.slice(0, 8)}`}</h3>

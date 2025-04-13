@@ -62,11 +62,11 @@ export function ScoreDetailsCard({ categoryScores, finalScore }: ScoreDetailsCar
   const sortedCategories = [...processedCategories].sort((a, b) => b.score - a.score);
   
   // Calculate total skills
-  const totalSkills = sortedCategories.reduce((sum, cat) => sum + cat.count, 0);
+  const totalSkills = sortedCategories.reduce((sum: any, cat: any) => sum + cat.count, 0);
   
   // Calculate total points
-  const totalPoints = sortedCategories.reduce((sum, cat) => sum + cat.rawPoints, 0);
-  const maxTotalPoints = sortedCategories.reduce((sum, cat) => sum + cat.maxPossible, 0);
+  const totalPoints = sortedCategories.reduce((sum: any, cat: any) => sum + cat.rawPoints, 0);
+  const maxTotalPoints = sortedCategories.reduce((sum: any, cat: any) => sum + cat.maxPossible, 0);
   
   // Format the final score
   const formattedFinalScore = Math.round(finalScore * 10) / 10;
@@ -101,7 +101,7 @@ export function ScoreDetailsCard({ categoryScores, finalScore }: ScoreDetailsCar
                     Here's how you scored in each category:
                   </p>
                   
-                  {sortedCategories.map(category => (
+                  {sortedCategories.map((category: any) => (
                     <div key={category.name} className="space-y-1">
                       <div className="flex justify-between items-center">
                         <span className="font-medium">{category.name}</span>
@@ -159,7 +159,7 @@ export function ScoreDetailsCard({ categoryScores, finalScore }: ScoreDetailsCar
                       </tr>
                     </thead>
                     <tbody>
-                      {sortedCategories.map(category => (
+                      {sortedCategories.map((category: any) => (
                         <tr key={category.name} className="border-b last:border-0">
                           <td className="py-2">{category.name}</td>
                           <td className="text-right py-2 font-medium">

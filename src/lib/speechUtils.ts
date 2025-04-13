@@ -7,7 +7,7 @@
  */
 export function formatSkillName(skill: string): string {
   return skill.split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word: any) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 }
 

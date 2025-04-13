@@ -68,33 +68,36 @@ function CoachEvaluationDetail() {
   const { data: evaluation, isLoading, error, refetch } = useQuery({
     queryKey: ['coach-evaluation', id],
     queryFn: () => fetchEvaluation(id as string),
-    enabled: !!id && !!user && user.role === 'coach',
-    onSuccess: (data) => {
-      // Initialize state from evaluation data
-      console.log("Evaluation data loaded:", data);
-      if (data.results?.transcript) {
-        setTranscript(data.results.transcript);
-      }
-      if (data.coach_feedback) {
-        setCoachFeedback(data.coach_feedback);
-      }
-      if (data.results?.audience) {
-        setAudienceInfo(data.results.audience);
-      }
-      if (data.results?.manual_scores) {
-        setManualScores(data.results.manual_scores);
-        console.log("Manual scores loaded:", data.results.manual_scores);
-      }
-      if (data.results?.critical_skills) {
-        setCriticalSkills(data.results.critical_skills);
-        console.log("Critical skills loaded:", data.results.critical_skills);
-      }
-      if (data.results?.adjusted_analysis) {
-        setAdjustedScores(data.results.adjusted_analysis);
-      }
-    }
+    enabled: !!id && !!user && user.role === 'coach'
   });
 
+  // Initialize state from evaluation data when it loads
+  useEffect(() => {
+    if (evaluation) {
+      console.log("Evaluation data loaded:", evaluation);
+      if (evaluation.results?.transcript) {
+        setTranscript(evaluation.results.transcript);
+      }
+      if (evaluation.coach_feedback) {
+        setCoachFeedback(evaluation.coach_feedback);
+      }
+      if (evaluation.results?.audience) {
+        setAudienceInfo(evaluation.results.audience);
+      }
+      if (evaluation.results?.manual_scores) {
+        setManualScores(evaluation.results.manual_scores);
+        console.log("Manual scores loaded:", evaluation.results.manual_scores);
+      }
+      if (evaluation.results?.critical_skills) {
+        setCriticalSkills(evaluation.results.critical_skills);
+        console.log("Critical skills loaded:", evaluation.results.critical_skills);
+      }
+      if (evaluation.results?.adjusted_analysis) {
+        setAdjustedScores(evaluation.results.adjusted_analysis);
+      }
+    }
+  }, [evaluation]);
+  
   // Derived state - Improve the hasAnalysis check to verify actual content
   const hasTranscript = !!transcript && transcript.length > 0;
   const hasAnalysis = evaluation?.results?.analysis && 
@@ -459,7 +462,7 @@ function CoachEvaluationDetail() {
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <span>Student: {evaluation.users?.name || 'Unknown'}</span>
               <span>•</span>
-              <Badge variant={isCompleted ? 'success' : isReviewing ? 'outline' : 'default'}>
+              <Badge variant={isCompleted ? 'secondary' : isReviewing ? 'outline' : 'default'}>
                 {evaluation.status.replace(/_/g, ' ')}
               </Badge>
             </div>

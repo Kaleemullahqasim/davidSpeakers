@@ -10,7 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
-import { Cross2Icon, CheckIcon, ShieldCheckIcon } from '@radix-ui/react-icons';
+import { Cross2Icon, CheckIcon } from '@radix-ui/react-icons';
+import { ShieldCheck } from 'lucide-react';
 
 export default function AdminUsers() {
   const { user, loading } = useAuth();
@@ -93,7 +94,7 @@ export default function AdminUsers() {
               Coaches
               {!coachesLoading && coaches?.some(coach => !coach.approved) && (
                 <Badge variant="destructive" className="ml-2">
-                  {coaches.filter(coach => !coach.approved).length}
+                  {coaches.filter((coach: any) => !coach.approved).length}
                 </Badge>
               )}
             </TabsTrigger>
@@ -111,9 +112,9 @@ export default function AdminUsers() {
               <CardContent>
                 {coachesLoading ? (
                   <p>Loading coaches...</p>
-                ) : coaches?.filter(coach => !coach.approved).length ? (
+                ) : coaches?.filter((coach: any) => !coach.approved).length ? (
                   <div className="space-y-4">
-                    {coaches.filter(coach => !coach.approved).map((coach) => (
+                    {coaches.filter((coach: any) => !coach.approved).map((coach) => (
                       <div key={coach.id} className="flex items-center justify-between border-b pb-4">
                         <div>
                           <h3 className="font-medium">{coach.name}</h3>
@@ -149,9 +150,9 @@ export default function AdminUsers() {
               <CardContent>
                 {coachesLoading ? (
                   <p>Loading coaches...</p>
-                ) : coaches?.filter(coach => coach.approved).length ? (
+                ) : coaches?.filter((coach: any) => coach.approved).length ? (
                   <div className="space-y-4">
-                    {coaches.filter(coach => coach.approved).map((coach) => (
+                    {coaches.filter((coach: any) => coach.approved).map((coach) => (
                       <div key={coach.id} className="flex items-center justify-between border-b pb-4">
                         <div>
                           <h3 className="font-medium">{coach.name}</h3>
@@ -219,7 +220,7 @@ export default function AdminUsers() {
                   <p>Loading students...</p>
                 ) : students?.length ? (
                   <div className="space-y-4">
-                    {students.map((student) => (
+                    {students.map((student: any) => (
                       <div key={student.id} className="flex items-center justify-between border-b pb-4">
                         <div>
                           <h3 className="font-medium">{student.name}</h3>

@@ -222,13 +222,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
       
       // Add activity listeners
-      activityEvents.forEach(event => {
+      activityEvents.forEach((event: any) => {
         window.addEventListener(event, handleUserActivity);
       });
       
       // Return cleanup function
       return () => {
-        activityEvents.forEach(event => {
+        activityEvents.forEach((event: any) => {
           window.removeEventListener(event, handleUserActivity);
         });
       };

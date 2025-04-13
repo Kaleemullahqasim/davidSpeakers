@@ -86,7 +86,7 @@ export function ManualScoringSection({
   const formatCategoryName = (category: string): string => {
     return category
       .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .map((word: any) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
   };
 
@@ -156,7 +156,7 @@ export function ManualScoringSection({
             <div className="space-y-4">
               <div className="pt-2">
                 <div className="flex justify-between text-xs text-gray-500 mb-2">
-                  {scoreLabels.map(label => (
+                  {scoreLabels.map((label: any) => (
                     <div key={label.value} className="text-center">
                       <div>{label.value}</div>
                       <div>{label.label}</div>

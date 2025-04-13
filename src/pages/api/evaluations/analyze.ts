@@ -73,7 +73,7 @@ export default async function handler(
       For each skill, provide a score and a brief explanation of why you assigned that score.
       
       Here are the skills to evaluate (format: ID. Skill Name):
-      ${languageSkills.map(skill => 
+      ${languageSkills.map((skill: any) => 
         `${skill.id}. ${skill.name}`
       ).join('\n')}
       
@@ -123,12 +123,12 @@ export default async function handler(
     }
     
     // Structure the analysis results
-    const structuredAnalysis = {};
+    const structuredAnalysis: Record<string, any> = {};
     
-    for (const [skillId, data] of Object.entries(analysis)) {
-      const skill = languageSkills.find(s => s.id.toString() === skillId);
+    for (const [skillId, data] of Object.entries(analysis) as [string, any][]) {
+      const skill = languageSkills.find((s: any) => s.id.toString() === skillId);
       if (skill) {
-        structuredAnalysis[skill.id] = {
+        structuredAnalysis[skill.id.toString()] = {
           name: skill.name,
           score: data.score,
           explanation: data.explanation,

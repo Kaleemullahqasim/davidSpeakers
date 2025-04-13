@@ -89,7 +89,7 @@ export default async function handler(
     }
     
     // Calculate total points
-    const totalPoints = skillScores?.reduce((sum, skill) => {
+    const totalPoints = skillScores?.reduce((sum: any, skill: any) => {
       const scoreToUse = skill.is_automated 
         ? (skill.adjusted_score !== null ? skill.adjusted_score : skill.actual_score_ai) 
         : skill.actual_score;
@@ -107,7 +107,7 @@ export default async function handler(
     console.log(`New final score: ${finalScore.toFixed(2)} (total: ${totalPoints.toFixed(2)} ÷ ${divider.toFixed(4)})`);
     
     // Calculate maximum potential score for reference
-    const maxPotentialPoints = skillScores?.reduce((sum, skill) => {
+    const maxPotentialPoints = skillScores?.reduce((sum: any, skill: any) => {
       return sum + (skill.max_score * skill.weight);
     }, 0) || 0;
     

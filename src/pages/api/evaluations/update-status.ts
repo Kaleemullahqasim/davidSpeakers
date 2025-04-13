@@ -206,8 +206,8 @@ export default async function handler(
 }
 
 // Helper function to calculate category summaries
-function calculateCategorySummary(scores) {
-  const categories = {
+function calculateCategorySummary(scores: any[]) {
+  const categories: Record<string, { score: number, count: number, maxPossible: number, rawPoints: number }> = {
     "Nervousness": { score: 0, count: 0, maxPossible: 0, rawPoints: 0 },
     "Voice": { score: 0, count: 0, maxPossible: 0, rawPoints: 0 },
     "Body Language": { score: 0, count: 0, maxPossible: 0, rawPoints: 0 },
@@ -217,7 +217,7 @@ function calculateCategorySummary(scores) {
   };
   
   // Process all scores by category
-  scores.forEach(score => {
+  scores.forEach((score: any) => {
     const category = getParentClassForSkill(score.skill_id);
     
     if (categories[category]) {
@@ -238,7 +238,7 @@ function calculateCategorySummary(scores) {
   });
   
   // Calculate percentage scores for each category
-  Object.keys(categories).forEach(category => {
+  Object.keys(categories).forEach((category: any) => {
     const data = categories[category];
     if (data.maxPossible > 0) {
       data.score = Math.round((data.rawPoints / data.maxPossible) * 100);
@@ -248,7 +248,7 @@ function calculateCategorySummary(scores) {
   return categories;
 }
 
-function getParentClassForSkill(skillId) {
+function getParentClassForSkill(skillId: number): string {
   if (skillId >= 1 && skillId <= 6) return "Nervousness";
   if (skillId >= 7 && skillId <= 32) return "Voice";
   if (skillId >= 33 && skillId <= 75) return "Body Language";

@@ -132,7 +132,7 @@ export function AILanguageAnalysisCard({ evaluation, expanded = false }: AILangu
                 <ScrollArea className="h-[350px]">
                   <TabsContent value="strengths" className="space-y-2 mt-0 pr-2">
                     {strengths.length > 0 ? (
-                      strengths.map(skill => (
+                      strengths.map((skill: any) => (
                         <SkillListItem 
                           key={skill.id} 
                           skill={skill} 
@@ -147,7 +147,7 @@ export function AILanguageAnalysisCard({ evaluation, expanded = false }: AILangu
                   
                   <TabsContent value="improvements" className="space-y-2 mt-0 pr-2">
                     {improvements.length > 0 ? (
-                      improvements.map(skill => (
+                      improvements.map((skill: any) => (
                         <SkillListItem 
                           key={skill.id} 
                           skill={skill}

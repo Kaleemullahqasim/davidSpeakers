@@ -336,7 +336,7 @@ function StudentEvaluationDetail() {
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <span>Completed: {new Date(evaluation?.completed_at || Date.now()).toLocaleDateString()}</span>
               <span>•</span>
-              <Badge variant="success">
+              <Badge variant="secondary">
                 Completed
               </Badge>
             </div>
@@ -430,12 +430,12 @@ function getParentSkills(scores: any[] = [], category: string) {
   
   // Get all unique skill IDs that belong to this category
   return scores
-    .filter(score => {
+    .filter((score: any) => {
       if (!score || !score.skill_id) return false;
       const skillCategory = getParentClassForSkill(score.skill_id);
       return skillCategory === category;
     })
-    .map(score => score.skill_id);
+    .map((score: any) => score.skill_id);
 }
 
 // Helper function to get skills for a specific category with fallbacks to ensure we always show something

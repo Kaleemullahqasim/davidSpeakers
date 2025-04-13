@@ -103,7 +103,7 @@ async function updateEvaluationWithResults(evaluationId: string, results: any) {
 async function analyzeTranscript(transcript: string, skills: any[]) {
   // Create skill categories lookup
   const skillCategories: { [key: string]: string[] } = {};
-  skills.forEach(skill => {
+  skills.forEach((skill: any) => {
     if (!skillCategories[skill.category]) {
       skillCategories[skill.category] = [];
     }
@@ -118,7 +118,7 @@ async function analyzeTranscript(transcript: string, skills: any[]) {
     
     ${Object.entries(skillCategories).map(([category, skillNames]) => `
     ${category}:
-    ${skillNames.map(name => `- ${name}`).join('\n')}
+    ${skillNames.map((name: any) => `- ${name}`).join('\n')}
     `).join('\n')}
     
     For each skill, provide:

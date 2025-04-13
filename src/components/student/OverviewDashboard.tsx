@@ -186,7 +186,7 @@ function getSkillById(id: number) {
     ];
   };
   
-  return getAllSkills().find(skill => skill.id === id);
+  return getAllSkills().find((skill: any) => skill.id === id);
 }
 
 // Helper function to get category score
@@ -217,7 +217,7 @@ function getCategoryScore(evaluation: any, category: string) {
   
   // Try to calculate from skill_scores if we have them
   if (evaluation.results?.skill_scores && evaluation.results.skill_scores.length > 0) {
-    const categoryScores = evaluation.results.skill_scores.filter(score => {
+    const categoryScores = evaluation.results.skill_scores.filter((score: any) => {
       const skillCategory = getParentClassForSkill(score.skill_id);
       const matchesCategory = skillCategory.toLowerCase() === category.toLowerCase();
       return matchesCategory;
@@ -229,7 +229,7 @@ function getCategoryScore(evaluation: any, category: string) {
       let totalPoints = 0;
       let maxPossible = 0;
       
-      categoryScores.forEach(score => {
+      categoryScores.forEach((score: any) => {
         const scoreValue = score.adjusted_score !== undefined ? score.adjusted_score :
                           score.actual_score !== undefined ? score.actual_score : 
                           score.actual_score_ai;
@@ -262,7 +262,7 @@ function getCategoryScore(evaluation: any, category: string) {
   // If we have raw points and a total point system, attempt to derive score
   if (evaluation.results?.raw_points && evaluation.results?.total_points) {
     const categoryKey = Object.keys(evaluation.results.raw_points)
-      .find(key => key.toLowerCase().includes(category.toLowerCase()));
+      .find((key: any) => key.toLowerCase().includes(category.toLowerCase()));
       
     if (categoryKey) {
       const rawPoints = evaluation.results.raw_points[categoryKey];

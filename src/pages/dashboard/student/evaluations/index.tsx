@@ -52,7 +52,7 @@ export default function StudentEvaluations() {
   }, [error, toast]);
 
   // Filter and sort evaluations
-  const filteredEvaluations = evaluations?.filter(evaluation => {
+  const filteredEvaluations = evaluations?.filter((evaluation: any) => {
     // Status filter
     if (statusFilter !== 'all') {
       if (statusFilter === 'pending' && !['pending', 'review_requested'].includes(evaluation.status)) {
@@ -192,7 +192,7 @@ export default function StudentEvaluations() {
               </div>
             ) : sortedEvaluations.length > 0 ? (
               <div className="space-y-4">
-                {sortedEvaluations.map(evaluation => (
+                {sortedEvaluations.map((evaluation: any) => (
                   <div key={evaluation.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border hover:bg-gray-50 transition-colors">
                     <div className="mb-3 sm:mb-0">
                       <div className="flex items-center gap-2 mb-2">

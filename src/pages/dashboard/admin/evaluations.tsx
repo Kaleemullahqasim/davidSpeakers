@@ -57,7 +57,7 @@ export default function AdminEvaluations() {
               </div>
             ) : allEvaluations && allEvaluations.length > 0 ? (
               <div className="space-y-4">
-                {allEvaluations.map((evaluation) => (
+                {allEvaluations.map((evaluation: any) => (
                   <div key={evaluation.id} className="flex items-center justify-between border-b pb-4">
                     <div>
                       <h3 className="font-medium">{evaluation.title || `Evaluation #${evaluation.id.slice(0, 8)}`}</h3>

@@ -67,7 +67,7 @@ export function ScoreSummaryTab({ evaluation, refreshTrigger }: ScoreSummaryTabP
       console.log(`🔍 Raw scores from database (${data.scores?.length || 0} total):`, data.scores);
       
       // Group scores by category for better debugging
-      const scoresByCategory = data.scores.reduce((acc, score) => {
+      const scoresByCategory = data.scores.reduce((acc: Record<string, any[]>, score: any) => {
         const category = getParentClassForSkill(score.skill_id);
         if (!acc[category]) acc[category] = [];
         acc[category].push(score);
@@ -207,7 +207,7 @@ export function ScoreSummaryTab({ evaluation, refreshTrigger }: ScoreSummaryTabP
     
     // Map the skill scores from the database by skill_id
     const skillMap = new Map();
-    scores.forEach((score) => {
+    scores.forEach((score: any) => {
       skillMap.set(score.skill_id.toString(), score);
     });
     
@@ -228,7 +228,7 @@ export function ScoreSummaryTab({ evaluation, refreshTrigger }: ScoreSummaryTabP
     const improvements: any[] = [];
     
     criticalSkillIds.forEach((skillId: string) => {
-      const skill = allSkills.find(s => s.id.toString() === skillId);
+      const skill = allSkills.find((s: any) => s.id.toString() === skillId);
       if (skill) {
         if (skill.isGoodSkill) {
           strengths.push({
@@ -303,11 +303,11 @@ export function ScoreSummaryTab({ evaluation, refreshTrigger }: ScoreSummaryTabP
     let overallMaxPossible = 0;
     
     // First process all manual scores from the database
-    scores.forEach(score => {
+    scores.forEach((score: any) => {
       const skillId = score.skill_id.toString();
       const category = getParentClassForSkill(parseInt(skillId));
       
-      if (categories[category]) {
+      if (categories[category as keyof typeof categories]) {
         // Get the score value - use adjusted score if available, otherwise use actual score
         const scoreValue = score.adjusted_score !== null && score.adjusted_score !== undefined
           ? score.adjusted_score
@@ -319,10 +319,10 @@ export function ScoreSummaryTab({ evaluation, refreshTrigger }: ScoreSummaryTabP
           const maxScore = score.max_score || 10;
           const points = scoreValue * weight;
           
-          categories[category].score += points;
-          categories[category].count += 1;
-          categories[category].maxPossible += (maxScore * weight);
-          categories[category].rawPoints += points;
+          categories[category as keyof typeof categories].score += points;
+          categories[category as keyof typeof categories].count += 1;
+          categories[category as keyof typeof categories].maxPossible += (maxScore * weight);
+          categories[category as keyof typeof categories].rawPoints += points;
           
           overallRawPointsTotal += points;
           overallMaxPossible += (maxScore * weight);
@@ -586,7 +586,7 @@ export function ScoreSummaryTab({ evaluation, refreshTrigger }: ScoreSummaryTabP
         
         <CardFooter className="bg-gray-50 border-t text-sm text-gray-500 flex justify-between items-center">
           <div>
-            Total skills evaluated: {Object.values(categoryScores).reduce((sum, cat) => sum + cat.count, 0)}
+            Total skills evaluated: {Object.values(categoryScores).reduce((sum: any, cat: any) => sum + cat.count, 0)}
           </div>
           <div className="flex items-center">
             Last updated: {new Date().toLocaleString()}
@@ -621,7 +621,7 @@ export function ScoreSummaryTab({ evaluation, refreshTrigger }: ScoreSummaryTabP
                 <h3 className="font-semibold text-green-700 mb-3">Strengths</h3>
                 {criticalStrengths.length > 0 ? (
                   <ul className="space-y-2">
-                    {criticalStrengths.map(skill => (
+                    {criticalStrengths.map((skill: any) => (
                       <li key={skill.id} className="flex items-center p-2 bg-green-50 rounded-md">
                         <Badge variant="outline" className="mr-2 bg-green-100 text-green-700 border-green-200">
                           {skill.category}
@@ -640,7 +640,7 @@ export function ScoreSummaryTab({ evaluation, refreshTrigger }: ScoreSummaryTabP
                 <h3 className="font-semibold text-amber-700 mb-3">Areas for Improvement</h3>
                 {criticalImprovements.length > 0 ? (
                   <ul className="space-y-2">
-                    {criticalImprovements.map(skill => (
+                    {criticalImprovements.map((skill: any) => (
                       <li key={skill.id} className="flex items-center p-2 bg-amber-50 rounded-md">
                         <Badge variant="outline" className="mr-2 bg-amber-100 text-amber-700 border-amber-200">
                           {skill.category}
@@ -822,7 +822,7 @@ export function ScoreSummaryTab({ evaluation, refreshTrigger }: ScoreSummaryTabP
                 
                 <h5 className="font-medium mt-4 mb-2 text-blue-600">Scores by Category:</h5>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
-                  {['Nervousness', 'Voice', 'Body Language', 'Expressions', 'Language', 'Ultimate Level'].map(category => {
+                  {['Nervousness', 'Voice', 'Body Language', 'Expressions', 'Language', 'Ultimate Level'].map((category: any) => {
                     const hasCategory = Object.keys(categoryScores).includes(category);
                     const count = hasCategory ? categoryScores[category].count : 0;
                     return (
