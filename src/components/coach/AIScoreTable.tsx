@@ -144,7 +144,7 @@ export function AIScoreTable({ evaluationId, aiAnalysis }: AIScoreTableProps) {
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>Google Gemini AI Language Analysis</span>
-          <Badge variant="success" className="ml-2">
+          <Badge variant="secondary" className="ml-2">
             AI Generated
           </Badge>
         </CardTitle>
