@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, User, Settings } from 'lucide-react';
+import { Bell, User, Settings, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
@@ -31,9 +31,20 @@ export default function Header({ user }: HeaderProps) {
     e.preventDefault();
     e.stopPropagation(); // Prevent event bubbling
     
+    // Prevent multiple logout attempts
+    if (isLoggingOut) return;
+    
     try {
       setIsLoggingOut(true);
+      
+      // Set a timeout to force navigation if logout takes too long
+      const timeoutId = setTimeout(() => {
+        console.log('Logout timeout reached, forcing navigation');
+        router.push('/login');
+      }, 5000); // 5 second timeout
+      
       await logout();
+      clearTimeout(timeoutId);
       router.push('/login');
     } catch (error) {
       console.error('Logout error:', error);
@@ -186,6 +197,7 @@ export default function Header({ user }: HeaderProps) {
               disabled={isLoggingOut}
               className={isLoggingOut ? "opacity-50 cursor-not-allowed" : ""}
             >
+              <LogOut className="mr-2 h-4 w-4" />
               <span>{isLoggingOut ? "Logging out..." : "Log out"}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>

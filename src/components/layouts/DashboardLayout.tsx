@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/context/AuthContext';
 import Sidebar from '@/components/layouts/Sidebar';
@@ -10,8 +10,41 @@ interface DashboardLayoutProps {
 }
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
-  const { user, loading } = useAuth();
+  const { user, loading, refreshSession } = useAuth();
   const router = useRouter();
+  const [authCheckTimeout, setAuthCheckTimeout] = useState(false);
+
+  // Handle auth check timeouts
+  useEffect(() => {
+    if (loading) {
+      const timeoutId = setTimeout(() => {
+        setAuthCheckTimeout(true);
+        console.log('Dashboard auth check timed out, redirecting to login');
+        router.push('/login');
+      }, 5000); // 5 second timeout
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [loading, router]);
+
+  // Attempt to refresh session when dashboard mounts
+  useEffect(() => {
+    const attemptSessionRefresh = async () => {
+      if (user) {
+        try {
+          const success = await refreshSession();
+          if (!success) {
+            console.log('Session refresh failed on dashboard mount, redirecting to login');
+            router.push('/login?expired=true');
+          }
+        } catch (error) {
+          console.error('Error refreshing session on dashboard mount:', error);
+        }
+      }
+    };
+    
+    attemptSessionRefresh();
+  }, [refreshSession, user, router]);
 
   useEffect(() => {
     // If not loading and not authenticated, redirect to login
@@ -40,7 +73,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   }, [user, loading, router]);
 
-  if (loading) {
+  if (loading && !authCheckTimeout) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

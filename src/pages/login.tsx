@@ -15,6 +15,18 @@ export default function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login, user, loading } = useAuth();
   const router = useRouter();
+  const [authCheckTimeout, setAuthCheckTimeout] = useState(false);
+
+  // Handle case where auth check is taking too long
+  useEffect(() => {
+    if (loading) {
+      const timeoutId = setTimeout(() => {
+        setAuthCheckTimeout(true);
+      }, 5000); // 5 second timeout for initial auth check
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [loading]);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -39,21 +51,30 @@ export default function Login() {
     setError('');
     setIsSubmitting(true);
     
+    // Set a timeout for login operation
+    const loginTimeoutId = setTimeout(() => {
+      setIsSubmitting(false);
+      setError('Login request timed out. Please try again.');
+    }, 10000); // 10 second timeout for login
+    
     try {
       const user = await login(email, password);
+      clearTimeout(loginTimeoutId);
       console.log('Login successful, user:', user);
       
       // Router will handle redirect based on role in useEffect
     } catch (err) {
+      clearTimeout(loginTimeoutId);
       console.error('Login error:', err);
       setError(err instanceof Error ? err.message : 'Login failed. Please check your credentials.');
     } finally {
+      clearTimeout(loginTimeoutId);
       setIsSubmitting(false);
     }
   };
 
-  // If still checking auth state, show loading
-  if (loading) {
+  // If still checking auth state and not timed out, show loading
+  if (loading && !authCheckTimeout) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -61,8 +82,14 @@ export default function Login() {
       </div>
     );
   }
+  
+  // If auth check timed out, show login form anyway
+  if (loading && authCheckTimeout) {
+    // Continue to show the login form, but with a warning
+    console.log('Auth check timed out, showing login form');
+  }
 
-  // Only show login form if not already authenticated
+  // Only show login form if not already authenticated or auth check timed out
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
@@ -79,10 +106,12 @@ export default function Login() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {error && (
-                <Alert variant="destructive" className="mb-4">
+              {(error || authCheckTimeout) && (
+                <Alert variant={authCheckTimeout ? "default" : "destructive"} className="mb-4">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
+                  <AlertDescription>
+                    {error || (authCheckTimeout ? "Authentication check taking longer than expected. You can still try to log in." : "")}
+                  </AlertDescription>
                 </Alert>
               )}
               <form onSubmit={handleSubmit}>

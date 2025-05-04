@@ -6,7 +6,13 @@ import { useRouter } from 'next/router';
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  }
+});
 
 // Define the user type with role information
 interface User {
@@ -33,6 +39,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 // Constants for token refresh
 const TOKEN_REFRESH_INTERVAL = 4 * 60 * 1000; // 4 minutes
 const SESSION_KEEPALIVE_INTERVAL = 60 * 1000; // 1 minute
+const MAX_AUTH_WAIT_TIME = 5000; // 5 seconds max wait time for auth operations
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -67,10 +74,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Load user on initial render
   useEffect(() => {
+    let authTimeout: NodeJS.Timeout;
+    
     const loadUser = async () => {
       try {
+        // Set timeout to prevent hanging on auth check
+        authTimeout = setTimeout(() => {
+          console.log('Auth check timed out, clearing loading state');
+          setLoading(false);
+        }, MAX_AUTH_WAIT_TIME);
+        
         // Check for session
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        
+        clearTimeout(authTimeout);
         
         if (sessionError) {
           console.error('Error getting session:', sessionError);
@@ -123,6 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         console.error('Unexpected error during auth check:', error);
       } finally {
+        clearTimeout(authTimeout);
         setLoading(false);
       }
     };
@@ -180,6 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     
     return () => {
+      clearTimeout(authTimeout);
       authListener.subscription.unsubscribe();
     };
   }, []);
@@ -196,7 +215,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Check if token is expired or will expire soon
         if (isTokenExpired(user.token)) {
           console.log('Token expired or expiring soon, refreshing in background...');
+          
+          // Set a timeout to prevent hanging on refresh
+          const refreshTimeout = setTimeout(() => {
+            console.error('Token refresh operation timed out');
+            // Force logout on refresh timeout
+            logout().then(() => router.push('/login?expired=true'));
+          }, MAX_AUTH_WAIT_TIME);
+          
           const newToken = await refreshToken();
+          clearTimeout(refreshTimeout);
           
           if (newToken) {
             setUser(prev => prev ? { ...prev, token: newToken } : null);
@@ -239,7 +267,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     // Set up a "keepalive" ping to prevent session from becoming stale
     const sessionKeepAliveInterval = setInterval(() => {
+      // Add timeout to prevent hanging on this operation
+      const keepaliveTimeout = setTimeout(() => {
+        console.error('Session keepalive operation timed out');
+      }, MAX_AUTH_WAIT_TIME);
+      
       supabase.auth.getSession().then(({ data, error }) => {
+        clearTimeout(keepaliveTimeout);
         if (error) {
           console.error('Error in session keepalive:', error);
         } else if (data?.session) {
@@ -261,10 +295,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
+      setLoading(true);
+      
+      // Set timeout to prevent hanging on login
+      const loginTimeout = setTimeout(() => {
+        setLoading(false);
+        throw new Error('Login operation timed out. Please try again.');
+      }, MAX_AUTH_WAIT_TIME);
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
+      
+      clearTimeout(loginTimeout);
       
       if (error) {
         throw error;
@@ -304,17 +348,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Login error:', error);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const logout = async () => {
     try {
-      setUser(null); // Clear user state first to prevent UI issues
+      setLoading(true);
+      
+      // Clear user state first to prevent UI issues
+      setUser(null);
       localStorage.removeItem('token');
       sessionStorage.removeItem('token');
       
-      // Attempt to sign out from Supabase (but we've already cleared local state)
+      // Set timeout to prevent hanging on logout
+      const logoutTimeout = setTimeout(() => {
+        console.error('Logout operation timed out, but local state is cleared');
+        setLoading(false);
+      }, MAX_AUTH_WAIT_TIME);
+      
+      // Attempt to sign out from Supabase
       const { error } = await supabase.auth.signOut();
+      
+      clearTimeout(logoutTimeout);
+      
       if (error) {
         console.error('Supabase logout error:', error);
         // Despite the error, we've already cleared local state,
@@ -323,9 +381,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error during logout:', error);
       // Ensure we're still logged out locally even if there's an exception
-      setUser(null);
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('token');
+    } finally {
+      setLoading(false);
     }
   };
 
