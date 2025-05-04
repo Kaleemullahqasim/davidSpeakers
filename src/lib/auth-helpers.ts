@@ -1,16 +1,10 @@
-import { createClient } from '@supabase/supabase-js';
-
-// Initialize Supabase client with proper types
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+import { supabase } from './supabaseClient'; // Import the singleton instance
 
 // Check if we're in the browser environment
 const isBrowser = typeof window !== 'undefined';
 
-// Create supabase client only on the client side
-const supabase = isBrowser 
-  ? createClient(supabaseUrl, supabaseKey)
-  : null;
+// Constants
+const AUTH_OPERATION_TIMEOUT = 10000; // 10 seconds
 
 export async function getAuthToken(): Promise<string | null> {
   try {
@@ -19,7 +13,17 @@ export async function getAuthToken(): Promise<string | null> {
       return null;
     }
     
-    const { data, error } = await supabase.auth.getSession();
+    // Create a timeout promise
+    const sessionPromise = supabase.auth.getSession();
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Get auth token timed out')), AUTH_OPERATION_TIMEOUT);
+    });
+    
+    // Race the promises
+    const { data, error } = await Promise.race([
+      sessionPromise,
+      timeoutPromise.then(() => ({ data: null, error: new Error('Get auth token timed out') }))
+    ]) as any;
     
     if (error) {
       console.error('Error getting auth session:', error);
@@ -49,26 +53,59 @@ export async function refreshToken(): Promise<string | null> {
     }
     
     console.log('Attempting to refresh token...');
-    const { data, error } = await supabase.auth.refreshSession();
     
-    if (error) {
-      console.error('Error refreshing token:', error);
+    // Create a timeout promise
+    const refreshPromise = supabase.auth.refreshSession();
+    const timeoutPromise = new Promise<{data: null, error: Error}>((_, reject) => {
+      setTimeout(() => reject(new Error('Token refresh timed out')), AUTH_OPERATION_TIMEOUT);
+    });
+    
+    try {
+      // Race the promises with proper error handling
+      const { data, error } = await Promise.race([
+        refreshPromise,
+        timeoutPromise
+      ]);
+      
+      if (error) {
+        console.error('Error refreshing token:', error);
+        // Make sure we clean up local storage on refresh error
+        if (isBrowser) {
+          localStorage.removeItem('token');
+          sessionStorage.removeItem('token');
+        }
+        return null;
+      }
+      
+      if (!data?.session?.access_token) {
+        console.log('No new session received during refresh');
+        return null;
+      }
+      
+      // Update stored tokens
+      if (isBrowser) {
+        localStorage.setItem('token', data.session.access_token);
+        sessionStorage.setItem('token', data.session.access_token);
+      }
+      
+      console.log('Token refreshed successfully');
+      return data.session.access_token;
+    } catch (innerError) {
+      console.error('Error in token refresh race:', innerError);
+      // Cleanup on timeout or other errors
+      if (isBrowser) {
+        localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
+      }
       return null;
     }
-    
-    if (!data?.session?.access_token) {
-      console.log('No new session received during refresh');
-      return null;
-    }
-    
-    // Update stored tokens
-    localStorage.setItem('token', data.session.access_token);
-    sessionStorage.setItem('token', data.session.access_token);
-    
-    console.log('Token refreshed successfully');
-    return data.session.access_token;
   } catch (error) {
     console.error('Error in refreshToken:', error);
+    // Ensure cleanup happens even in the outer catch block
+    if (isBrowser) {
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+    }
     return null;
   }
 }
@@ -80,7 +117,7 @@ export async function refreshToken(): Promise<string | null> {
  */
 export async function fetchWithAuth(url: string, options: RequestInit = {}) {
   // Get the token from localStorage
-  let token = localStorage.getItem('token');
+  let token = isBrowser ? localStorage.getItem('token') : null;
   
   if (!token) {
     throw new Error('No authentication token found. Please log in.');
@@ -93,9 +130,15 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
     
     if (!token) {
       // Force logout if refresh fails
-      if (typeof window !== 'undefined') {
+      if (isBrowser) {
         localStorage.removeItem('token');
         sessionStorage.removeItem('token');
+        // Clear any Supabase-specific storage
+        Object.keys(localStorage).forEach(key => {
+          if (/^sb-.*-auth-token$/.test(key)) {
+            localStorage.removeItem(key);
+          }
+        });
         window.location.href = '/login?expired=true';
       }
       throw new Error('Session expired. Please log in again.');
@@ -110,10 +153,48 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
   };
   
   // Return the fetch promise
-  return fetch(url, {
-    ...options,
-    headers: authHeaders
-  });
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: authHeaders
+    });
+    
+    // If we get a 401 Unauthorized, try to refresh the token once
+    if (response.status === 401) {
+      console.log('Got 401 response, attempting to refresh token...');
+      const newToken = await refreshToken();
+      
+      if (newToken) {
+        // Retry the request with the new token
+        return fetch(url, {
+          ...options,
+          headers: {
+            ...authHeaders,
+            'Authorization': `Bearer ${newToken}`
+          }
+        });
+      } else {
+        // Force logout if refresh fails
+        if (isBrowser) {
+          localStorage.removeItem('token');
+          sessionStorage.removeItem('token');
+          // Clear any Supabase-specific storage
+          Object.keys(localStorage).forEach(key => {
+            if (/^sb-.*-auth-token$/.test(key)) {
+              localStorage.removeItem(key);
+            }
+          });
+          window.location.href = '/login?expired=true';
+        }
+        throw new Error('Session expired during request. Please log in again.');
+      }
+    }
+    
+    return response;
+  } catch (error) {
+    console.error('Error in fetchWithAuth:', error);
+    throw error;
+  }
 }
 
 /**
@@ -121,16 +202,39 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
  */
 export function getTokenExpiration(token: string): number | null {
   try {
-    // Extract the payload part of the JWT
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    // Parse the JSON payload
-    const payload = JSON.parse(window.atob(base64));
+    if (!token || typeof token !== 'string') {
+      console.error('Invalid token provided to getTokenExpiration');
+      return null;
+    }
     
-    // Return the expiration timestamp
-    return payload.exp * 1000; // Convert to milliseconds
+    // Check if the token has the expected JWT format
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      console.error('Token does not appear to be a valid JWT');
+      return null;
+    }
+    
+    // Extract the payload part of the JWT
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    
+    // Parse the JSON payload
+    try {
+      const payload = JSON.parse(window.atob(base64));
+      
+      // Return the expiration timestamp
+      if (!payload.exp) {
+        console.warn('Token payload does not contain expiration');
+        return null;
+      }
+      
+      return payload.exp * 1000; // Convert to milliseconds
+    } catch (parseError) {
+      console.error('Error parsing token payload:', parseError);
+      return null;
+    }
   } catch (error) {
-    console.error('Error parsing token:', error);
+    console.error('Error in getTokenExpiration:', error);
     return null;
   }
 }
@@ -139,12 +243,27 @@ export function getTokenExpiration(token: string): number | null {
  * Check if a token is expired
  */
 export function isTokenExpired(token: string): boolean {
-  const expiration = getTokenExpiration(token);
-  if (!expiration) return true;
+  if (!token) {
+    console.warn('No token provided to isTokenExpired');
+    return true;
+  }
   
-  // Return true if token is expired or will expire in the next 30 seconds
-  // This gives us a buffer to refresh tokens before they actually expire
-  return Date.now() > (expiration - 30000);
+  const expiration = getTokenExpiration(token);
+  if (!expiration) {
+    console.warn('Could not determine token expiration, treating as expired');
+    return true;
+  }
+  
+  // Return true if token is expired or will expire in the next 60 seconds
+  // Increased buffer from 30s to 60s to give more time for token refresh
+  const expirationBuffer = 60000; // 60 seconds in ms
+  const isExpired = Date.now() > (expiration - expirationBuffer);
+  
+  if (isExpired) {
+    console.log(`Token will expire soon or has expired. Current time: ${new Date(Date.now()).toISOString()}, Expiration: ${new Date(expiration).toISOString()}`);
+  }
+  
+  return isExpired;
 }
 
 /**

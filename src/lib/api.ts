@@ -1,7 +1,7 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 import { fetchWithAuth } from '@/lib/auth-helpers';
 import { getAuthToken } from './auth-helpers';
+import { supabase } from './supabaseClient'; // Import the singleton instance
 
 // Types
 export interface User {
@@ -42,16 +42,6 @@ export interface ScoringRule {
   min_occurrences: number;
   max_occurrences: number | null;
   score: number;
-}
-
-// Initialize Supabase client
-let supabase: SupabaseClient | null = null;
-
-// Check if we're in a browser environment
-if (typeof window !== 'undefined') {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  supabase = createClient(supabaseUrl, supabaseKey);
 }
 
 // API functions
