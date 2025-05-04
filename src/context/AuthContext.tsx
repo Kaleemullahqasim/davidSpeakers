@@ -1,16 +1,79 @@
 import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { refreshToken, isTokenExpired } from '../lib/auth-helpers';
+import { refreshToken, isTokenExpired, logAuthError } from '../lib/auth-helpers';
 import { useRouter } from 'next/router';
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
+
+// Environment-specific configuration
+const ENV_CONFIG = {
+  development: {
+    authTimeout: 5000,
+    retryAttempts: 1
+  },
+  production: {
+    authTimeout: 15000, // Longer timeout for production
+    retryAttempts: 2    // Allow more retries in production
+  }
+};
+
+// Get environment-specific configuration
+const getEnvConfig = () => {
+  const env = process.env.NODE_ENV === 'production' ? 'production' : 'development';
+  return ENV_CONFIG[env];
+};
+
+// Retry function for auth operations
+async function withRetry<T>(
+  operation: () => Promise<T>, 
+  maxRetries: number = getEnvConfig().retryAttempts
+): Promise<T> {
+  let lastError: any;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      // If not the first attempt, add a delay with exponential backoff
+      if (attempt > 0) {
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Max 5 second delay
+        console.log(`Retry attempt ${attempt}/${maxRetries} after ${delay}ms`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+      
+      return await operation();
+    } catch (error) {
+      console.error(`Attempt ${attempt + 1}/${maxRetries + 1} failed:`, error);
+      lastError = error;
+      
+      // If this is a "no retry" type of error, break immediately
+      if (error?.message?.includes('Invalid login credentials') || 
+          error?.message?.includes('invalid refresh token')) {
+        throw error;
+      }
+    }
+  }
+  
+  throw lastError || new Error('Operation failed after retries');
+}
+
+// Get the current site URL for proper redirects
+const getSiteUrl = () => {
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+  // Default fallback - should be overridden by actual origin in browser
+  return process.env.NEXT_PUBLIC_SITE_URL || 'https://david-speakers-pcas.vercel.app';
+};
+
 const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    flowType: 'implicit',
+    // Add site URL for proper redirects in production
+    site_url: getSiteUrl()
   }
 });
 
@@ -39,7 +102,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 // Constants for token refresh
 const TOKEN_REFRESH_INTERVAL = 4 * 60 * 1000; // 4 minutes
 const SESSION_KEEPALIVE_INTERVAL = 60 * 1000; // 1 minute
-const MAX_AUTH_WAIT_TIME = 5000; // 5 seconds max wait time for auth operations
+const MAX_AUTH_WAIT_TIME = getEnvConfig().authTimeout; // Dynamic timeout based on environment
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -296,57 +359,91 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       setLoading(true);
+      console.log('Attempting login for user:', email);
       
-      // Set timeout to prevent hanging on login
-      const loginTimeout = setTimeout(() => {
-        setLoading(false);
-        throw new Error('Login operation timed out. Please try again.');
-      }, MAX_AUTH_WAIT_TIME);
-      
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-      
-      clearTimeout(loginTimeout);
-      
-      if (error) {
-        throw error;
+      // Clear any stale tokens first
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
       }
       
-      if (!data.user) {
-        throw new Error('Login successful but no user returned');
-      }
-      
-      // Get user role from database
-      const { data: profileData, error: profileError } = await supabase
-        .from('users')
-        .select('role, name')
-        .eq('id', data.user.id)
-        .single();
-      
-      if (profileError) {
-        throw new Error('Could not retrieve user role');
-      }
-      
-      // Construct complete user object with role and token
-      const userWithRole = {
-        id: data.user.id,
-        email: data.user.email!,
-        role: profileData.role,
-        name: profileData.name,
-        token: data.session.access_token
+      // Login operation that will be retried if necessary
+      const performLogin = async () => {
+        // Set timeout to prevent hanging on login
+        const loginPromise = supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+        
+        // Use Promise.race to implement a timeout
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => {
+            reject(new Error(`Login operation timed out after ${MAX_AUTH_WAIT_TIME}ms`));
+          }, MAX_AUTH_WAIT_TIME);
+        });
+        
+        // Race the login promise against the timeout
+        const { data, error } = await Promise.race([
+          loginPromise,
+          timeoutPromise
+        ]) as any;
+        
+        if (error) {
+          console.error('Supabase auth error:', error.message);
+          throw error;
+        }
+        
+        if (!data?.user) {
+          console.error('Login successful but no user returned from Supabase');
+          throw new Error('Login successful but no user returned');
+        }
+        
+        console.log('Supabase auth successful, fetching user role');
+        
+        // Get user role from database
+        const profileResponse = await supabase
+          .from('users')
+          .select('role, name')
+          .eq('id', data.user.id)
+          .single();
+          
+        if (profileResponse.error) {
+          console.error('Error retrieving user role:', profileResponse.error);
+          throw new Error('Could not retrieve user role');
+        }
+        
+        const profileData = profileResponse.data;
+        console.log('User role retrieved:', profileData.role);
+        
+        // Construct complete user object with role and token
+        const userWithRole = {
+          id: data.user.id,
+          email: data.user.email!,
+          role: profileData.role,
+          name: profileData.name,
+          token: data.session.access_token
+        };
+        
+        return userWithRole;
       };
       
+      // Use the retry mechanism for better reliability in production
+      const userWithRole = await withRetry(performLogin);
+      
+      // Set the user state after successful login with retries
       setUser(userWithRole);
       
       // Save token to localStorage for API calls
-      localStorage.setItem('token', data.session.access_token);
-      sessionStorage.setItem('token', data.session.access_token);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('token', userWithRole.token);
+        sessionStorage.setItem('token', userWithRole.token);
+        console.log('Auth token saved to storage');
+      }
       
       return userWithRole;
     } catch (error) {
       console.error('Login error:', error);
+      logAuthError('Login Function', error);
       throw error;
     } finally {
       setLoading(false);
@@ -356,11 +453,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       setLoading(true);
+      console.log('Starting logout process');
       
       // Clear user state first to prevent UI issues
       setUser(null);
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('token');
+      
+      // Clear tokens from storage
+      if (typeof window !== 'undefined') {
+        console.log('Clearing auth tokens from storage');
+        localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
+        
+        // Also clear any other Supabase-related storage items
+        for (const key of Object.keys(localStorage)) {
+          if (key.startsWith('sb-') || key.includes('supabase')) {
+            console.log('Clearing Supabase storage item:', key);
+            localStorage.removeItem(key);
+          }
+        }
+      }
       
       // Set timeout to prevent hanging on logout
       const logoutTimeout = setTimeout(() => {
@@ -369,6 +480,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }, MAX_AUTH_WAIT_TIME);
       
       // Attempt to sign out from Supabase
+      console.log('Sending signOut request to Supabase');
       const { error } = await supabase.auth.signOut();
       
       clearTimeout(logoutTimeout);
@@ -377,12 +489,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('Supabase logout error:', error);
         // Despite the error, we've already cleared local state,
         // so the user will be effectively logged out on the client
+      } else {
+        console.log('Supabase signOut completed successfully');
       }
     } catch (error) {
       console.error('Error during logout:', error);
       // Ensure we're still logged out locally even if there's an exception
     } finally {
       setLoading(false);
+      console.log('Logout process completed');
     }
   };
 

@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2, Mic } from 'lucide-react';
+import { checkSupabaseHealth, logAuthError } from '@/lib/auth-helpers';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -17,12 +18,23 @@ export default function Login() {
   const router = useRouter();
   const [authCheckTimeout, setAuthCheckTimeout] = useState(false);
 
+  // Run Supabase health check on mount
+  useEffect(() => {
+    const health = checkSupabaseHealth();
+    console.log('[Login Page] Supabase health check:', health);
+    
+    if (!health.isHealthy) {
+      setError(`Authentication system unavailable. Please try again later. (${health.details.error || 'Unknown error'})`);
+    }
+  }, []);
+
   // Handle case where auth check is taking too long
   useEffect(() => {
     if (loading) {
       const timeoutId = setTimeout(() => {
         setAuthCheckTimeout(true);
-      }, 5000); // 5 second timeout for initial auth check
+        console.log('[Login Page] Auth check timed out, showing login form');
+      }, 10000); // Increased to 10 seconds for production
       
       return () => clearTimeout(timeoutId);
     }
@@ -31,6 +43,7 @@ export default function Login() {
   // Redirect if already authenticated
   useEffect(() => {
     if (!loading && user) {
+      console.log('[Login Page] User authenticated, redirecting to dashboard');
       // Redirect based on user role
       if (user.role === 'admin') {
         router.push('/dashboard/admin');
@@ -51,22 +64,48 @@ export default function Login() {
     setError('');
     setIsSubmitting(true);
     
+    console.log('[Login Page] Attempting login...');
+    
+    // Check Supabase health before attempting login
+    const health = checkSupabaseHealth();
+    if (!health.isHealthy) {
+      setIsSubmitting(false);
+      setError(`Authentication system unavailable. Please try again later. (${health.details.error || 'Connection issue'})`);
+      console.error('[Login Page] Supabase health check failed:', health);
+      return;
+    }
+    
     // Set a timeout for login operation
     const loginTimeoutId = setTimeout(() => {
       setIsSubmitting(false);
       setError('Login request timed out. Please try again.');
-    }, 10000); // 10 second timeout for login
+      console.error('[Login Page] Login operation timed out after 20 seconds');
+      logAuthError('Login Timeout', { email, duration: 20000 });
+    }, 20000); // Increased to 20 seconds for production
     
     try {
       const user = await login(email, password);
       clearTimeout(loginTimeoutId);
-      console.log('Login successful, user:', user);
+      console.log('[Login Page] Login successful, user:', user);
       
       // Router will handle redirect based on role in useEffect
     } catch (err) {
       clearTimeout(loginTimeoutId);
-      console.error('Login error:', err);
-      setError(err instanceof Error ? err.message : 'Login failed. Please check your credentials.');
+      console.error('[Login Page] Login error:', err);
+      logAuthError('Login Failure', err);
+      
+      // More user-friendly error messages
+      if (err instanceof Error) {
+        if (err.message.includes('timeout')) {
+          setError('Login timed out. This could be due to network issues. Please try again.');
+        } else if (err.message.includes('Invalid login credentials')) {
+          setError('Invalid email or password. Please check your credentials and try again.');
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError('Login failed. Please check your credentials.');
+      }
     } finally {
       clearTimeout(loginTimeoutId);
       setIsSubmitting(false);
