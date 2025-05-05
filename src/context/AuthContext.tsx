@@ -49,27 +49,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const newToken = await refreshToken(); // Uses helper with timeout
         
         if (!newToken) {
-          console.error('refreshSession: Failed to refresh token');
+          console.error('refreshSession: Failed to refresh token. Clearing local state.');
           // Clean up immediately on refresh failure
           setUser(null);
-          localStorage.removeItem('token');
-          sessionStorage.removeItem('token');
+          localStorage.removeItem('token'); // Clear app token
+          sessionStorage.removeItem('token'); // Clear app token
           
-          // Clear any Supabase-specific tokens
-          if (typeof window !== 'undefined') {
-            Object.keys(localStorage).forEach(key => {
-              if (/^sb-.*-auth-token$/.test(key)) {
-                localStorage.removeItem(key);
-              }
-            });
-          }
+          // REMOVED: Manual Supabase localStorage key clearing loop
           
-          // Don't redirect here to avoid interrupting user experience
+          // Optionally, explicitly sign out if refresh fails definitively
+          supabase.auth.signOut().catch(err => console.error('[AuthContext] refreshSession: Supabase signOut error after failed refresh:', err));
+          
           return false;
         }
         
         // Update user with new token
         setUser(prev => prev ? { ...prev, token: newToken } : null);
+        // Also update storage immediately
+        localStorage.setItem('token', newToken);
+        sessionStorage.setItem('token', newToken);
         console.log('refreshSession: Token refreshed successfully');
         return true;
       }
@@ -77,6 +75,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return true; // Token still valid
     } catch (error) {
       console.error('Error refreshing session:', error);
+      // Ensure cleanup on unexpected error during refresh
+      setUser(null);
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      supabase.auth.signOut().catch(err => console.error('[AuthContext] refreshSession: Supabase signOut error after exception:', err));
       return false;
     }
   };
@@ -347,16 +350,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log('[AuthContext] login: Calling supabase.auth.signInWithPassword()...');
       
-      // Clean up any existing tokens first to avoid conflicts
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('token');
-      if (typeof window !== 'undefined') {
-        Object.keys(localStorage).forEach(key => { 
-          if (/^sb-.*-auth-token$/.test(key)) { 
-            localStorage.removeItem(key);
-          }
-        });
-      }
+      // REMOVED: Pre-emptive manual token clearing (app-specific and Supabase keys)
       
       // Create a Promise to handle the login request with a timeout
       const loginPromise = supabase.auth.signInWithPassword({
@@ -370,35 +364,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       
       try {
-        // Await the result of the sign-in attempt or timeout with better type safety
+        // Await the result of the sign-in attempt or timeout
         const { data, error } = await Promise.race([
           loginPromise,
           timeoutPromise
         ]);
         
         if (error) {
-          console.error('[AuthContext] login: Supabase sign-in error:', error);
-          // Clear state just in case something partially succeeded before error
-          setUser(null);
-          localStorage.removeItem('token');
-          sessionStorage.removeItem('token');
-          if (typeof window !== 'undefined') {
-            Object.keys(localStorage).forEach(key => { 
-              if (/^sb-.*-auth-token$/.test(key)) { 
-                localStorage.removeItem(key); 
-              }
-            });
-          }
+          console.error('[AuthContext] login: Supabase sign-in error or timeout:', error);
+          setUser(null); // Ensure user state is null on error
+          // REMOVED: Manual token clearing in error case
           console.groupEnd();
-          throw error; // Propagate error to UI
+          // Propagate a user-friendly error message
+          if (error.message === 'Login timed out') {
+             throw new Error('Login process timed out. Please try again.');
+          }
+          throw error; 
         }
         
-        // IMPORTANT: Check if we actually got a user and session.
+        // Check if we actually got a user and session.
         if (!data?.user || !data?.session) { 
           console.warn('[AuthContext] login: signInWithPassword call succeeded but returned no user/session data immediately.', { data });
-          // This is unusual but can happen. Let onAuthStateChange handle it.
+          // Rely on onAuthStateChange to handle this scenario.
           console.groupEnd();
-          return; // Still return success as onAuthStateChange will likely handle this
+          return; // Indicate potential success, listener will confirm
         } 
         
         console.log('[AuthContext] login: signInWithPassword successful with data:', { 
@@ -406,43 +395,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           session: data.session 
         });
         
-        // Store the token immediately
+        // Store the token immediately (still useful for immediate API calls before listener fires)
+        // This is okay as it's the app-specific token, not Supabase internal.
         localStorage.setItem('token', data.session.access_token);
         sessionStorage.setItem('token', data.session.access_token);
         
-        // Return minimal success indicator
+        // Let onAuthStateChange handle setting the final user state
         console.groupEnd();
         return true; // Indicate success
       } catch (raceError) {
         // This handles Promise.race errors, particularly timeout
         console.error('[AuthContext] login: Error during login race:', raceError);
-        setUser(null);
-        localStorage.removeItem('token');
-        sessionStorage.removeItem('token');
-        if (typeof window !== 'undefined') {
-          Object.keys(localStorage).forEach(key => { 
-            if (/^sb-.*-auth-token$/.test(key)) { 
-              localStorage.removeItem(key); 
-            }
-          });
-        }
+        setUser(null); // Ensure user state is null on error
+        // REMOVED: Manual token clearing in raceError case
         console.groupEnd();
-        throw new Error('Login process timed out. Please try again.');
+        // Throw specific timeout error
+         if (raceError instanceof Error && raceError.message === 'Login timed out') {
+           throw new Error('Login process timed out. Please try again.');
+         }
+        throw raceError; // Re-throw other race errors
       }
     } catch (outerError) {
-      // This catch block now primarily handles errors from the whole login process
+      // This catch block now primarily handles errors propagated from the inner try/catch
       console.error('[AuthContext] login: Outer catch - Error during login process:', outerError);
-      // Ensure local state is cleared on any login failure
-      setUser(null);
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('token');
-      if (typeof window !== 'undefined') {
-        Object.keys(localStorage).forEach(key => { 
-          if (/^sb-.*-auth-token$/.test(key)) { 
-            localStorage.removeItem(key); 
-          }
-        });
-      }
+      setUser(null); // Ensure user state is null on any login failure
+      // REMOVED: Manual token clearing in outerError case
       console.groupEnd();
       throw outerError; // Re-throw the error for the UI to handle
     }
@@ -451,56 +428,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     console.groupCollapsed('[AuthContext] logout: Attempting logout...');
     try {
-      // --- Aggressive Cleanup --- 
-      // 1. Clear application state
+      // 1. Clear application state FIRST
       console.log('[AuthContext] logout: Step 1 - Clearing local user state and application tokens.');
       setUser(null);
       localStorage.removeItem('token');       // App-specific token
       sessionStorage.removeItem('token');      // App-specific token (if used)
 
-      // 2. Manually clear Supabase auth token from localStorage
-      console.log('[AuthContext] logout: Step 2 - Manually clearing Supabase localStorage keys...');
-      if (typeof window !== 'undefined') {
-        let foundSupabaseKey = false;
-        Object.keys(localStorage).forEach(key => {
-          // Target keys like sb-xxxxxxxxxxxxxxxxxx-auth-token
-          if (/^sb-.*-auth-token$/.test(key)) { 
-            foundSupabaseKey = true;
-            localStorage.removeItem(key);
-            console.log(`[AuthContext] logout: Removed Supabase localStorage key: ${key}`);
-          }
-        });
-        if (!foundSupabaseKey) {
-          console.warn('[AuthContext] logout: No Supabase auth token key found in localStorage to remove.');
-        }
-      }
+      // REMOVED: Manual Supabase localStorage key clearing loop
+      // REMOVED: Manual Supabase cookie clearing loop
 
-      // 3. Manually clear Supabase auth cookies
-      console.log('[AuthContext] logout: Step 3 - Manually clearing Supabase cookies...');
-      if (typeof document !== 'undefined') {
-        const cookies = document.cookie.split(';');
-        let foundSupabaseCookie = false;
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i];
-            const eqPos = cookie.indexOf('=');
-            const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
-            // Target common Supabase cookie names or pattern
-            if (name.startsWith('sb-')) { 
-                foundSupabaseCookie = true;
-                console.log(`[AuthContext] logout: Deleting cookie: ${name}`);
-                // Delete cookie by setting expiry date to the past
-                // Path=/ is important to ensure deletion regardless of current path
-                document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-            }
-        }
-        if (!foundSupabaseCookie) {
-             console.warn('[AuthContext] logout: No Supabase cookies found to remove.');
-        }
-      }
-      // --- End Aggressive Cleanup ---
-
-      // 4. Attempt Supabase sign out (with timeout)
-      console.log('[AuthContext] logout: Step 4 - Calling Supabase signOut...');
+      // 2. Attempt Supabase sign out (with timeout) - This should handle Supabase's storage
+      console.log('[AuthContext] logout: Step 2 - Calling Supabase signOut...');
       
       try {
         const logoutPromise = supabase.auth.signOut();
@@ -515,49 +453,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ]);
         
         if (error) {
-          console.error('[AuthContext] logout: Supabase signOut error:', error);
-          // Log error, but local state, localStorage & cookies are already cleared.
+          console.error('[AuthContext] logout: Supabase signOut error or timeout:', error);
+          // Log error, but proceed with redirect as local state is cleared.
         } else {
           console.log('[AuthContext] logout: Supabase signOut call completed successfully.');
         }
       } catch (raceError) {
         console.error('[AuthContext] logout: Timeout or race error during signOut:', raceError);
-        // This is fine, we've already cleared local state
+        // Proceed with redirect.
       }
       
-      // Always make sure we report successful logout from the application perspective
-      // since we've already cleared all local state and storage
-      console.log('[AuthContext] logout: Logout process finished.');
+      console.log('[AuthContext] logout: Logout process finished locally.');
     } catch (error) {
       console.error('[AuthContext] logout: Unexpected error during logout process:', error);
       // Ensure local state is cleared even if there's an unexpected exception
       setUser(null);
       localStorage.removeItem('token');
       sessionStorage.removeItem('token');
-      
-      // Attempt manual Supabase key/cookie removal again in case of early error
-      if (typeof window !== 'undefined') {
-        Object.keys(localStorage).forEach(key => {
-          if (/^sb-.*-auth-token$/.test(key)) { localStorage.removeItem(key); }
-        });
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i];
-            const eqPos = cookie.indexOf('=');
-            const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
-            if (name.startsWith('sb-')) { 
-                document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-            }
-        }
-      }
     } finally {
-      // Always redirect to login page after logout attempt, regardless of success/failure
-      // to ensure user isn't stuck with partially logged-out state
+      // Always redirect to login page after logout attempt
       if (typeof window !== 'undefined') {
-        // Slight delay to allow state updates to complete
+        // Slight delay to allow potential state updates/cleanup to settle
         setTimeout(() => {
+          console.log('[AuthContext] logout: Redirecting to /login');
           window.location.href = '/login';
-        }, 100);
+        }, 100); 
       }
       console.groupEnd();
     }
