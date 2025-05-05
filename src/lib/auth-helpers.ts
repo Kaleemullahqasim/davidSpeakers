@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient'; // Import the singleton instance
+import { supabase, resetSupabaseAuth } from './supabaseClient'; // Import the singleton instance
 
 // Check if we're in the browser environment
 const isBrowser = typeof window !== 'undefined';
@@ -48,6 +48,19 @@ export async function getAuthToken(): Promise<string | null> {
  * Refreshes the authentication token
  */
 export async function refreshToken(): Promise<string | null> {
+  // Add idle detection
+  const lastActivity = getLastActivity();
+  const now = Date.now();
+  const IDLE_THRESHOLD = 10 * 60 * 1000; // 10 minutes
+  
+  // If we've been idle for too long in production, do a more aggressive reset
+  if (process.env.NODE_ENV === 'production' && 
+      lastActivity && 
+      (now - lastActivity > IDLE_THRESHOLD)) {
+    console.log('Long idle period detected in production, performing aggressive reset');
+    await resetSupabaseAuth();
+  }
+  
   // Don't allow multiple simultaneous refresh attempts
   if (isRefreshingToken) {
     console.log('Token refresh already in progress, waiting...');
@@ -293,4 +306,11 @@ export function getRoleRedirectPath(role: string): string {
     default:
       return '/dashboard';
   }
+}
+
+// Add this helper function
+function getLastActivity(): number | null {
+  if (!isBrowser) return null;
+  const lastActivity = localStorage.getItem('last-activity');
+  return lastActivity ? parseInt(lastActivity, 10) : null;
 }

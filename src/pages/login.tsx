@@ -8,6 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2, Mic } from 'lucide-react';
 
+// Import resetSupabaseAuth
+import { resetSupabaseAuth } from '@/lib/supabaseClient';
+
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,33 +32,25 @@ export default function Login() {
     return () => clearTimeout(timeoutId);
   }, [loading]);
   
-  // Handle forced refresh if authentication check is stuck
-  const handleForceRefresh = () => {
-    // Clear any potential stuck auth state before refreshing
-    localStorage.removeItem('token');
-    sessionStorage.removeItem('token');
-    
-    // Clear any Supabase-specific tokens
-    if (typeof window !== 'undefined') {
-      Object.keys(localStorage).forEach(key => {
-        if (/^sb-.*-auth-token$/.test(key)) {
-          localStorage.removeItem(key);
-        }
-      });
+  // Enhance handleForceRefresh function
+  const handleForceRefresh = async () => {
+    try {
+      // Use the centralized reset function
+      await resetSupabaseAuth();
       
-      // Clear cookies
-      const cookies = document.cookie.split(';');
-      for (let i = 0; i < cookies.length; i++) {
-        const cookie = cookies[i];
-        const eqPos = cookie.indexOf('=');
-        const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
-        if (name.startsWith('sb-')) { 
-          document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-        }
-      }
+      // Also reset our own tokens
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      localStorage.removeItem('last-activity');
+      
+      // Force page reload after short delay to ensure cleanup is complete
+      setTimeout(() => {
+        window.location.href = '/login?reset=true';
+      }, 100);
+    } catch (error) {
+      console.error('Error during recovery:', error);
+      setError('Recovery failed. Please try again or clear your browser cache.');
     }
-    
-    window.location.reload();
   };
 
   // Redirect if already authenticated

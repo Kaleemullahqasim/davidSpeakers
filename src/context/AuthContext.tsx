@@ -1,7 +1,7 @@
 import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { refreshToken, isTokenExpired } from '../lib/auth-helpers';
 import { useRouter } from 'next/router';
-import { supabase } from '../lib/supabaseClient'; // Import the singleton instance
+import { supabase, resetSupabaseAuth, updateUserActivity } from '../lib/supabaseClient'; // Import the singleton instance
 
 // Define the user type with role information
 interface User {
@@ -341,27 +341,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authListener?.subscription.unsubscribe();
     };
   }, []); // Only run on mount
+
+  // Track user activity
+  useEffect(() => {
+    if (typeof window !== 'undefined' && user) {
+      // Update activity timestamp on user interaction
+      const handleActivity = () => updateUserActivity();
+      
+      ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(event => {
+        window.addEventListener(event, handleActivity, { passive: true });
+      });
+      
+      return () => {
+        ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(event => {
+          window.removeEventListener(event, handleActivity);
+        });
+      };
+    }
+  }, [user]);
   
   const login = async (email: string, password: string) => {
     console.groupCollapsed(`[AuthContext] login: Attempting login for ${email}...`);
     try {
+      // First, ensure we have a clean state - very important for production
+      await resetSupabaseAuth();
+      
       console.log('[AuthContext] login: Calling supabase.auth.signInWithPassword()...');
       
-      // Clean up any existing tokens first to avoid conflicts
+      // Clean up any existing tokens
       localStorage.removeItem('token');
       sessionStorage.removeItem('token');
-      if (typeof window !== 'undefined') {
-        Object.keys(localStorage).forEach(key => { 
-          if (/^sb-.*-auth-token$/.test(key)) { 
-            localStorage.removeItem(key);
-          }
-        });
-      }
+      
+      // Use a more reliable approach for production environments
+      const isProduction = process.env.NODE_ENV === 'production';
+      const loginOptions = isProduction 
+        ? { redirectTo: window.location.origin } 
+        : undefined;
       
       // Create a Promise to handle the login request with a timeout
       const loginPromise = supabase.auth.signInWithPassword({
         email,
-        password
+        password,
+        ...loginOptions
       });
       
       console.log(`[AuthContext] login: Racing signInWithPassword against ${AUTH_OPERATION_TIMEOUT}ms timeout.`);
@@ -385,7 +406,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (typeof window !== 'undefined') {
             Object.keys(localStorage).forEach(key => { 
               if (/^sb-.*-auth-token$/.test(key)) { 
-                localStorage.removeItem(key); 
+                localStorage.removeItem(key);
               }
             });
           }
@@ -409,6 +430,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Store the token immediately
         localStorage.setItem('token', data.session.access_token);
         sessionStorage.setItem('token', data.session.access_token);
+        
+        // Update activity timestamp on successful login
+        updateUserActivity();
         
         // Return minimal success indicator
         console.groupEnd();
@@ -451,6 +475,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     console.groupCollapsed('[AuthContext] logout: Attempting logout...');
     try {
+      // Use the centralized reset function
+      await resetSupabaseAuth();
+      
       // --- Aggressive Cleanup --- 
       // 1. Clear application state
       console.log('[AuthContext] logout: Step 1 - Clearing local user state and application tokens.');
