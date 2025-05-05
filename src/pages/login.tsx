@@ -19,6 +19,7 @@ export default function Login() {
   const { login, user, loading } = useAuth();
   const router = useRouter();
   const [authCheckTimeout, setAuthCheckTimeout] = useState(false);
+  const [recoveryInProgress, setRecoveryInProgress] = useState(false);
   
   // Handle extended auth check timeouts with more aggressive recovery
   useEffect(() => {
@@ -95,6 +96,7 @@ export default function Login() {
   // Redirect if already authenticated
   useEffect(() => {
     if (!loading && user) {
+      console.log('[Login Page] User detected, redirecting...');
       // Redirect based on user role
       if (user.role === 'admin') {
         router.push('/dashboard/admin');
@@ -106,6 +108,8 @@ export default function Login() {
         // Fallback for unknown roles
         router.push('/dashboard');
       }
+    } else if (!loading && !user) {
+      console.log('[Login Page] No user detected, showing login form.');
     }
   }, [user, loading, router]);
 
@@ -114,25 +118,32 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
-    
-    // Set a timeout to handle stuck login requests
-    const loginTimeout = setTimeout(() => {
-      if (isSubmitting) {
-        setError('Login is taking longer than expected. Please try again.');
-        setIsSubmitting(false);
-      }
-    }, 10000); // 10-second timeout for login operation
+    setAuthCheckTimeout(false); // Reset recovery prompt on new attempt
     
     try {
-      const user = await login(email, password);
-      clearTimeout(loginTimeout);
-      console.log('Login successful, user:', user);
+      // login function now returns boolean
+      const success = await login(email, password); 
       
-      // Router will handle redirect based on role in useEffect
-    } catch (err) {
-      clearTimeout(loginTimeout);
-      console.error('Login error:', err);
-      setError(err instanceof Error ? err.message : 'Login failed. Please check your credentials.');
+      if (success) {
+        console.log('[Login Page] Login successful, waiting for redirect...');
+        // Redirect is handled by the useEffect watching `user` state
+      } else {
+         // This case might not happen if login throws errors, but handle defensively
+         setError('Login failed. Please try again.');
+      }
+    } catch (err: any) {
+      console.error('[Login Page] Login error:', err);
+      // Provide more specific error messages
+      if (err.message.includes('timed out')) {
+        setError('Login request timed out. Please check your connection or try recovering session.');
+        setAuthCheckTimeout(true); // Show recovery option on timeout
+      } else if (err.message.includes('Invalid login credentials')) { // Check for Supabase specific error
+        setError('Invalid email or password.');
+      } else if (err.message.includes('fetch user profile')) {
+         setError('Login succeeded but failed to load profile. Please try again.');
+      } else {
+        setError(`Login failed: ${err.message || 'Please try again.'}`);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -148,7 +159,7 @@ export default function Login() {
         </div>
         
         {authCheckTimeout && (
-          <div className="mt-6 text-center">
+          <div className="mt-6 text-center p-4 max-w-md">
             <p className="text-gray-600 mb-2">Authentication check is taking longer than usual.</p>
             <Button 
               onClick={handleForceRefresh} 
@@ -186,6 +197,14 @@ export default function Login() {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
+              {authCheckTimeout && !isSubmitting && (
+                <Alert variant="warning" className="mb-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Login request timed out. Please check your connection or try recovering session.
+                  </AlertDescription>
+                </Alert>
+              )}
               <form onSubmit={handleSubmit}>
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -214,7 +233,7 @@ export default function Login() {
                       required
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  <Button type="submit" className="w-full" disabled={isSubmitting || recoveryInProgress}>
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />

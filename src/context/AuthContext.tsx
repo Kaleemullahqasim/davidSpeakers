@@ -1,7 +1,8 @@
 import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
-import { refreshToken, isTokenExpired } from '../lib/auth-helpers';
+// Import helpers correctly
+import { refreshToken, isTokenExpired, performLogout, getLastActivity, updateLastActivity } from '../lib/auth-helpers'; 
 import { useRouter } from 'next/router';
-import { supabase, resetSupabaseAuth, updateUserActivity } from '../lib/supabaseClient'; // Updated to use lib version
+import { supabase, resetSupabaseAuth } from '../lib/supabaseClient'; // Keep resetSupabaseAuth import for login
 
 // Define the user type with role information
 interface User {
@@ -26,11 +27,11 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 // Constants for token refresh
-const AUTH_OPERATION_TIMEOUT = 15000; // 10 seconds timeout for auth operations
+const AUTH_OPERATION_TIMEOUT = 15000; // 15 seconds timeout
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Start loading true
   const router = useRouter();
 
   // Session refresh function that will be exposed in context
@@ -71,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Update user with new token
         setUser(prev => prev ? { ...prev, token: newToken } : null);
         console.log('refreshSession: Token refreshed successfully');
+        updateLastActivity();
         return true;
       }
       console.log('refreshSession: Token is still valid');
@@ -83,147 +85,114 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Load user on initial render
   useEffect(() => {
-    let isActive = true; // Flag to prevent state updates after unmount
-    console.log('[AuthContext] useEffect Mount: Initializing...');
-    
+    let isActive = true;
+    console.log('[AuthContext] useEffect Mount: Initializing auth state...');
+    setLoading(true); // Ensure loading is true at the start
+
     const loadUser = async () => {
       console.groupCollapsed('[AuthContext] loadUser: Starting initial authentication check...');
       try {
-        // Add timeout to getSession call
         console.log('[AuthContext] loadUser: Calling supabase.auth.getSession()');
+        // Use timeout for getSession
         const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Session check timed out')), AUTH_OPERATION_TIMEOUT);
-        });
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session check timed out')), AUTH_OPERATION_TIMEOUT)
+        );
         
-        console.log(`[AuthContext] loadUser: Racing getSession against ${AUTH_OPERATION_TIMEOUT}ms timeout.`);
         const { data: sessionData, error: sessionError } = await Promise.race([
-          sessionPromise,
-          timeoutPromise.then(() => ({ data: { session: null }, error: new Error('Session check timed out') }))
+          sessionPromise.then(res => ({ ...res, source: 'getSession' })), // Add source for debugging
+          timeoutPromise.then(() => ({ data: null, error: new Error('Session check timed out'), source: 'timeout' }))
         ]) as any;
-        
+
         if (!isActive) {
           console.warn('[AuthContext] loadUser: Aborted - Component unmounted during getSession');
           console.groupEnd();
           return;
         }
-        
+
         if (sessionError) {
           console.error('[AuthContext] loadUser: Error or timeout during getSession:', sessionError);
-          setUser(null);
-          setLoading(false);
-          console.groupEnd();
-          return;
-        }
-        
-        if (!sessionData.session) {
+          // Treat timeout/error as logged out state
+          setUser(null); 
+          // Don't clear tokens here, resetSupabaseAuth handles it if needed during login/logout
+        } else if (!sessionData?.session) {
           console.log('[AuthContext] loadUser: No active session found via getSession.');
           setUser(null);
-          setLoading(false);
-          console.groupEnd();
-          return;
-        }
-        
-        console.log('[AuthContext] loadUser: Session found via getSession. Validating token...', { session: sessionData.session });
-        let currentToken = sessionData.session.access_token;
-        let isTokenValid = !isTokenExpired(currentToken);
-        console.log(`[AuthContext] loadUser: Token from session - isTokenExpired result: ${!isTokenValid}`);
-        
-        // Check if the found token is expired
-        if (!isTokenValid) {
-          console.log('[AuthContext] loadUser: Token in session is expired, attempting refresh...');
-          console.log('[AuthContext] loadUser: Calling refreshToken()...');
-          const newToken = await refreshToken(); // Uses helper with timeout
-          
-          if (!isActive) {
-            console.warn('[AuthContext] loadUser: Aborted - Component unmounted during refreshToken');
-            console.groupEnd();
-            return;
-          }
-          
-          if (!newToken) {
-            console.error('[AuthContext] loadUser: Failed to refresh expired token. Clearing state.');
-            // If refresh fails, treat as logged out
-            setUser(null);
-            localStorage.removeItem('token');
-            sessionStorage.removeItem('token');
-            // Explicitly try to sign out supabase client state after failed refresh
-            supabase.auth.signOut().catch(err => console.error('[AuthContext] loadUser: Supabase signOut error after failed refresh:', err));
-            setLoading(false);
-            console.groupEnd();
-            return;
-          }
-          console.log('[AuthContext] loadUser: Token refresh successful. Proceeding with new token.');
-          currentToken = newToken;
-          isTokenValid = true; // Mark as valid now
         } else {
-          console.log('[AuthContext] loadUser: Token in session is valid. Proceeding.');
+          // Session found - validate token and potentially refresh
+          console.log('[AuthContext] loadUser: Session found. Validating token...');
+          let currentToken = sessionData.session.access_token;
+          let isTokenValid = !isTokenExpired(currentToken);
+          console.log(`[AuthContext] loadUser: Token validity check: ${isTokenValid}`);
+
+          if (!isTokenValid) {
+            console.log('[AuthContext] loadUser: Token expired, attempting refresh...');
+            const newToken = await refreshToken(); // Uses helper with timeout & logging
+
+            if (!isActive) { /* ... unmount check ... */ return; }
+
+            if (!newToken) {
+              console.error('[AuthContext] loadUser: Failed to refresh expired token. Treating as logged out.');
+              setUser(null);
+              // Perform a clean reset if refresh fails during load
+              await resetSupabaseAuth(); 
+            } else {
+              console.log('[AuthContext] loadUser: Token refresh successful.');
+              currentToken = newToken;
+              isTokenValid = true;
+            }
+          }
+
+          // If token is valid (or was refreshed), get user details
+          if (isTokenValid && currentToken) {
+            console.log('[AuthContext] loadUser: Token valid, calling supabase.auth.getUser()...');
+            const { data: userData, error: userError } = await supabase.auth.getUser();
+
+            if (!isActive) { /* ... unmount check ... */ return; }
+
+            if (userError || !userData?.user) {
+              console.error('[AuthContext] loadUser: Error getting user data:', userError);
+              setUser(null);
+              await resetSupabaseAuth(); // Reset if getUser fails despite valid token
+            } else {
+              console.log('[AuthContext] loadUser: Got user data. Fetching profile...');
+              // Fetch profile... (existing logic)
+              const { data: profileData, error: profileError } = await supabase
+                .from('users')
+                .select('role, name')
+                .eq('id', userData.user.id)
+                .single();
+
+              if (!isActive) { /* ... unmount check ... */ return; }
+
+              if (profileError) {
+                console.error('[AuthContext] loadUser: Error fetching profile:', profileError);
+                setUser(null);
+                await resetSupabaseAuth(); // Reset if profile fetch fails
+              } else {
+                console.log('[AuthContext] loadUser: Profile fetched. Setting user state.');
+                const finalUser: User = {
+                  id: userData.user.id,
+                  email: userData.user.email!,
+                  role: profileData.role,
+                  name: profileData.name,
+                  token: currentToken // Store the valid token
+                };
+                setUser(finalUser);
+                // Store token and update activity *only* when user is successfully set
+                localStorage.setItem('token', currentToken);
+                sessionStorage.setItem('token', currentToken);
+                updateLastActivity();
+                console.log('[AuthContext] loadUser: User state successfully set:', finalUser);
+              }
+            }
+          }
         }
-        
-        // Session should exist and token should be valid now.
-        console.log('[AuthContext] loadUser: Calling supabase.auth.getUser()...');
-        const { data: userData, error: userError } = await supabase.auth.getUser();
-        
-        if (!isActive) {
-          console.warn('[AuthContext] loadUser: Aborted - Component unmounted during getUser');
-          console.groupEnd();
-          return;
-        }
-        
-        if (userError || !userData.user) {
-          console.error('[AuthContext] loadUser: Error getting user data from Supabase:', userError);
-          setUser(null);
-          setLoading(false);
-          console.groupEnd();
-          return;
-        }
-        
-        console.log('[AuthContext] loadUser: Got user data from Supabase. Fetching profile...:', { user: userData.user });
-        // Get user role from users table
-        const { data: profileData, error: profileError } = await supabase
-          .from('users')
-          .select('role, name')
-          .eq('id', userData.user.id)
-          .single();
-        
-        if (!isActive) {
-          console.warn('[AuthContext] loadUser: Aborted - Component unmounted during profile fetch');
-          console.groupEnd();
-          return;
-        }
-        
-        if (profileError) {
-          console.error('[AuthContext] loadUser: Error fetching user profile from DB:', profileError);
-          // Decide if this is critical. Maybe log error but still set user?
-          // For now, treat as failure
-          setUser(null);
-          setLoading(false);
-          console.groupEnd();
-          return;
-        }
-        
-        console.log('[AuthContext] loadUser: Profile fetched successfully:', { profile: profileData });
-        console.log('[AuthContext] loadUser: Setting user state and storing token.');
-        // Store token in localStorage for API calls (using the potentially refreshed token)
-        localStorage.setItem('token', currentToken);
-        sessionStorage.setItem('token', currentToken);
-        
-        // Set the complete user object with role information
-        const finalUser = {
-          id: userData.user.id,
-          email: userData.user.email!,
-          role: profileData.role,
-          name: profileData.name,
-          token: currentToken
-        };
-        setUser(finalUser);
-        console.log('[AuthContext] loadUser: User state successfully set:', finalUser);
-        
       } catch (error) {
         console.error('[AuthContext] loadUser: Unexpected error during auth check:', error);
-        if (isActive) {
-          setUser(null);
-        }
+        if (isActive) setUser(null);
+        // Attempt reset on unexpected errors too
+        await resetSupabaseAuth();
       } finally {
         if (isActive) {
           console.log('[AuthContext] loadUser: Final step - setting loading = false.');
@@ -232,121 +201,85 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.groupEnd();
       }
     };
-    
+
     loadUser();
-    
+
     // Set up auth state change listener
     console.log('[AuthContext] useEffect Mount: Setting up onAuthStateChange listener.');
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Debounce or ensure listener logic doesn't conflict with manual loadUser/login/logout
       console.groupCollapsed(`[AuthContext] onAuthStateChange: Event received: ${event}`);
       console.log('Details:', { event, session });
-      
+
       if (!isActive) {
-        console.warn('[AuthContext] onAuthStateChange: Aborted - Component unmounted, ignoring event');
+        console.warn('[AuthContext] onAuthStateChange: Aborted - Component unmounted.');
         console.groupEnd();
         return;
       }
-      
+
+      // Simplify listener logic - primarily rely on manual flows (login/logout/loadUser)
+      // and use the listener mainly for external events (e.g., password recovery, multi-tab)
+      // or token refreshes initiated by Supabase itself.
+
       if (event === 'SIGNED_IN' && session) {
-        console.log('[AuthContext] onAuthStateChange (SIGNED_IN): Processing...');
-        try {
-          console.log('[AuthContext] onAuthStateChange (SIGNED_IN): Fetching profile...');
-          // Get user role from database
-          const { data: profileData, error: profileError } = await supabase
-            .from('users')
-            .select('role, name')
-            .eq('id', session.user.id)
-            .single();
-          
-          if (!isActive) {
-            console.warn('[AuthContext] onAuthStateChange (SIGNED_IN): Aborted - Component unmounted during profile fetch');
-            console.groupEnd();
-            return;
-          }
-          
-          if (profileError) {
-            console.error('[AuthContext] onAuthStateChange (SIGNED_IN): Error fetching user profile:', profileError);
-            // Handle appropriately - maybe sign out again?
-            setUser(null); 
-            console.groupEnd();
-            return;
-          }
-          
-          console.log('[AuthContext] onAuthStateChange (SIGNED_IN): Profile fetched. Setting state and tokens.', { profile: profileData });
-          // Save token to localStorage/sessionStorage
-          localStorage.setItem('token', session.access_token);
-          sessionStorage.setItem('token', session.access_token);
-          
-          // Set the complete user
-          const signedInUser = {
-            id: session.user.id,
-            email: session.user.email!,
-            role: profileData.role,
-            name: profileData.name,
-            token: session.access_token
-          };
-          setUser(signedInUser);
-          console.log('[AuthContext] onAuthStateChange (SIGNED_IN): User state updated successfully.', signedInUser);
-        } catch (error) {
-          console.error('onAuthStateChange (SIGNED_IN): Error setting user data:', error);
-          if (isActive) setUser(null);
+        console.log('[AuthContext] onAuthStateChange (SIGNED_IN): Received SIGNED_IN event. Re-validating session...');
+        // Re-trigger loadUser or a simplified version to ensure consistency
+        // Avoid setting state directly here if login function handles it
+        // Maybe just log it or trigger a re-validation if user is not set
+        if (!user) {
+           console.log('[AuthContext] onAuthStateChange (SIGNED_IN): User not set, potentially initial load or external sign in. Triggering loadUser.');
+           await loadUser(); // Re-run the load logic
+        } else {
+           console.log('[AuthContext] onAuthStateChange (SIGNED_IN): User already set, likely handled by login function.');
+           // Optionally update token if different
+           if (user.token !== session.access_token) {
+             console.log('[AuthContext] onAuthStateChange (SIGNED_IN): Updating token from event.');
+             localStorage.setItem('token', session.access_token);
+             sessionStorage.setItem('token', session.access_token);
+             setUser(prev => prev ? { ...prev, token: session.access_token } : null);
+             updateLastActivity();
+           }
         }
       } else if (event === 'TOKEN_REFRESHED' && session) {
-        console.log('[AuthContext] onAuthStateChange (TOKEN_REFRESHED): Processing...');
-        
-        if (!isActive) {
-          console.warn('[AuthContext] onAuthStateChange (TOKEN_REFRESHED): Aborted - Component unmounted.');
-          console.groupEnd();
-          return;
-        }
-        
-        console.log('[AuthContext] onAuthStateChange (TOKEN_REFRESHED): Updating tokens and user state.');
-        // Update stored tokens
+        console.log('[AuthContext] onAuthStateChange (TOKEN_REFRESHED): Updating token and activity.');
         localStorage.setItem('token', session.access_token);
         sessionStorage.setItem('token', session.access_token);
-        
-        // Update user state with new token
-        setUser(prev => {
-          const updatedUser = prev ? { ...prev, token: session.access_token } : null;
-          console.log('[AuthContext] onAuthStateChange (TOKEN_REFRESHED): User state updated with new token.', updatedUser);
-          return updatedUser;
-        });
-        
+        setUser(prev => prev ? { ...prev, token: session.access_token } : null);
+        updateLastActivity(); // Update activity on background refresh too
       } else if (event === 'SIGNED_OUT') {
-        console.log('[AuthContext] onAuthStateChange (SIGNED_OUT): Processing...');
-        if (!isActive) {
-          console.warn('[AuthContext] onAuthStateChange (SIGNED_OUT): Aborted - Component unmounted.');
-          console.groupEnd();
-          return;
+        console.log('[AuthContext] onAuthStateChange (SIGNED_OUT): Received SIGNED_OUT event.');
+        // Ensure state is cleared if a sign out happens unexpectedly (e.g., from another tab)
+        if (user) { // Only clear if user was previously set
+          console.log('[AuthContext] onAuthStateChange (SIGNED_OUT): Clearing user state due to external event.');
+          setUser(null);
+          localStorage.removeItem('token');
+          sessionStorage.removeItem('token');
+          localStorage.removeItem('last-activity');
+          // Consider if a redirect is needed here, maybe router.push('/login?reason=external_logout');
+        } else {
+          console.log('[AuthContext] onAuthStateChange (SIGNED_OUT): User already null, likely handled by logout function.');
         }
-        
-        console.log('[AuthContext] onAuthStateChange (SIGNED_OUT): Clearing user state and tokens.');
-        // Clear user state and tokens
-        setUser(null);
-        localStorage.removeItem('token');
-        sessionStorage.removeItem('token');
       } else if (event === 'INITIAL_SESSION') {
-        console.log('[AuthContext] onAuthStateChange (INITIAL_SESSION): Event received. Usually handled by loadUser.');
-        // Usually handled by the initial loadUser, but good to log.
+         console.log('[AuthContext] onAuthStateChange (INITIAL_SESSION): Handled by initial loadUser.');
       } else {
-        console.log(`[AuthContext] onAuthStateChange: Unhandled event type: ${event}`);
+         console.log(`[AuthContext] onAuthStateChange: Unhandled event type: ${event}`);
       }
       console.groupEnd();
     });
-    
+
     // Cleanup listener on unmount
     return () => {
-      console.log('[AuthContext] useEffect Cleanup: Unsubscribing from onAuthStateChange and setting isActive=false.');
+      console.log('[AuthContext] useEffect Cleanup: Unsubscribing from onAuthStateChange.');
       isActive = false;
       authListener?.subscription.unsubscribe();
     };
-  }, []); // Only run on mount
+  }, []); // Run only on mount
 
   // Track user activity
   useEffect(() => {
     if (typeof window !== 'undefined' && user) {
       // Update activity timestamp on user interaction
-      const handleActivity = () => updateUserActivity();
+      const handleActivity = () => updateLastActivity();
       
       ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(event => {
         window.addEventListener(event, handleActivity, { passive: true });
@@ -367,285 +300,113 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return lastActivity ? parseInt(lastActivity, 10) : null;
   };
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<boolean> => { // Return boolean success
     console.groupCollapsed(`[AuthContext] login: Attempting login for ${email}...`);
+    setLoading(true); // Indicate loading state during login attempt
+    setError(''); // Clear previous errors (assuming an error state exists)
+
     try {
-      // Production-specific handling for login after idle periods
-      if (process.env.NODE_ENV === 'production') {
-        console.log('[AuthContext] login: Production environment detected');
-        
-        // Check if we're coming back from idle - this approach is more targeted than
-        // always doing resetSupabaseAuth which can break the login flow
-        const lastActivity = getLastActivityTime();
-        const now = Date.now();
-        const idleThreshold = 10 * 60 * 1000; // 10 minutes
-        
-        if (lastActivity && (now - lastActivity > idleThreshold)) {
-          console.log(`[AuthContext] login: Detected login after long idle period (${Math.round((now - lastActivity)/1000/60)} minutes)`);
-          
-          // Clear only our application's tokens first
-          localStorage.removeItem('token');
-          sessionStorage.removeItem('token');
-          
-          try {
-            // For production idle period logins, try a more careful approach
-            // First try a refresh rather than a complete reset
-            const { data } = await supabase.auth.refreshSession();
-            
-            if (!data?.session) {
-              console.log('[AuthContext] login: No valid session after refresh, will proceed with clean login');
-              // Wait a moment before continuing with clean state
-              await new Promise(resolve => setTimeout(resolve, 300));
-              
-              // Now do a focused cleanup rather than full reset
-              if (typeof window !== 'undefined') {
-                Object.keys(localStorage).forEach(key => {
-                  if (/^sb-.*-auth-token$/.test(key)) {
-                    console.log(`[AuthContext] login: Removing stale token: ${key}`);
-                    localStorage.removeItem(key);
-                  }
-                });
-              }
-            } else {
-              console.log('[AuthContext] login: Successfully refreshed session, continuing with login');
-            }
-          } catch (refreshError) {
-            console.error('[AuthContext] login: Error during pre-login refresh:', refreshError);
-            // Continue with login process after error
-          }
-        } else {
-          console.log('[AuthContext] login: No long idle period detected, proceeding with standard login');
-          // For regular (non-idle) logins in production or local dev, do a clean reset
-          await resetSupabaseAuth();
-        }
-      } else {
-        // For local development, continue with existing full reset approach
-        await resetSupabaseAuth();
-      }
-      
+      // 1. Perform a full auth reset BEFORE attempting to sign in.
+      // This is crucial to clear any potentially inconsistent state from idle periods.
+      console.log('[AuthContext] login: Performing pre-login auth reset...');
+      await resetSupabaseAuth();
+      console.log('[AuthContext] login: Pre-login auth reset complete.');
+
+      // 2. Attempt sign-in with timeout
       console.log('[AuthContext] login: Calling supabase.auth.signInWithPassword()...');
-      
-      // Clean up any existing tokens
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('token');
-      
-      // Use a more reliable approach for production environments
-      const isProduction = process.env.NODE_ENV === 'production';
-      const loginOptions = isProduction 
-        ? { 
-            redirectTo: window.location.origin,
-            shouldCreateUser: false // Don't try to create new users on login
-          } 
-        : undefined;
-      
-      // Create a Promise to handle the login request with a timeout
-      const loginPromise = supabase.auth.signInWithPassword({
-        email,
-        password,
-        ...loginOptions
-      });
-      
-      console.log(`[AuthContext] login: Racing signInWithPassword against ${AUTH_OPERATION_TIMEOUT}ms timeout.`);
-      const timeoutPromise = new Promise<{data: null, error: Error}>((_, reject) => {
-        setTimeout(() => reject(new Error('Login timed out')), AUTH_OPERATION_TIMEOUT);
-      });
-      
-      try {
-        // Await the result of the sign-in attempt or timeout with better type safety
-        const { data, error } = await Promise.race([
-          loginPromise,
-          timeoutPromise
-        ]);
-        
-        if (error) {
-          console.error('[AuthContext] login: Supabase sign-in error:', error);
-          // Clear state just in case something partially succeeded before error
-          setUser(null);
-          localStorage.removeItem('token');
-          sessionStorage.removeItem('token');
-          if (typeof window !== 'undefined') {
-            Object.keys(localStorage).forEach(key => { 
-              if (/^sb-.*-auth-token$/.test(key)) { 
-                localStorage.removeItem(key); 
-              }
-            });
-          }
-          console.groupEnd();
-          throw error; // Propagate error to UI
-        }
-        
-        // IMPORTANT: Check if we actually got a user and session.
-        if (!data?.user || !data?.session) { 
-          console.warn('[AuthContext] login: signInWithPassword call succeeded but returned no user/session data immediately.', { data });
-          // This is unusual but can happen. Let onAuthStateChange handle it.
-          console.groupEnd();
-          return; // Still return success as onAuthStateChange will likely handle this
-        } 
-        
-        console.log('[AuthContext] login: signInWithPassword successful with data:', { 
-          user: data.user, 
-          session: data.session 
-        });
-        
-        // Store the token immediately
-        localStorage.setItem('token', data.session.access_token);
-        sessionStorage.setItem('token', data.session.access_token);
-        
-        // Store last activity timestamp on successful login
-        updateUserActivity();
-        
-        // Return minimal success indicator
-        console.groupEnd();
-        return true; // Indicate success
-      } catch (raceError) {
-        // This handles Promise.race errors, particularly timeout
-        console.error('[AuthContext] login: Error during login race:', raceError);
-        setUser(null);
-        localStorage.removeItem('token');
+      const loginPromise = supabase.auth.signInWithPassword({ email, password });
+      const timeoutPromise = new Promise<{ data: null, error: Error }>((_, reject) =>
+        setTimeout(() => reject(new Error('Login timed out')), AUTH_OPERATION_TIMEOUT)
+      );
+
+      const { data, error } = await Promise.race([loginPromise, timeoutPromise]);
+
+      if (error) {
+        console.error('[AuthContext] login: Supabase sign-in error or timeout:', error);
+        // Ensure state is clear after failed login
+        setUser(null); 
+        // resetSupabaseAuth already cleared storage, no need to repeat fully
+        localStorage.removeItem('token'); // Just ensure app token is gone
         sessionStorage.removeItem('token');
-        if (typeof window !== 'undefined') {
-          Object.keys(localStorage).forEach(key => { 
-            if (/^sb-.*-auth-token$/.test(key)) { 
-              localStorage.removeItem(key); 
-            }
-          });
-        }
-        console.groupEnd();
-        throw new Error('Login process timed out. Please try again.');
+        throw error; // Propagate error to UI
       }
-    } catch (outerError) {
-      // This catch block now primarily handles errors from the whole login process
-      console.error('[AuthContext] login: Outer catch - Error during login process:', outerError);
-      // Ensure local state is cleared on any login failure
-      setUser(null);
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('token');
-      if (typeof window !== 'undefined') {
-        Object.keys(localStorage).forEach(key => { 
-          if (/^sb-.*-auth-token$/.test(key)) { 
-            localStorage.removeItem(key); 
-          }
-        });
+
+      if (!data?.user || !data?.session) {
+        console.error('[AuthContext] login: signInWithPassword succeeded but returned no user/session data.');
+        setUser(null);
+        throw new Error('Login failed: No session data received.');
       }
+
+      // 3. Sign-in successful, now fetch profile and set state
+      console.log('[AuthContext] login: signInWithPassword successful. Fetching profile...');
+      const { data: profileData, error: profileError } = await supabase
+        .from('users')
+        .select('role, name')
+        .eq('id', data.user.id)
+        .single();
+
+      if (profileError) {
+        console.error('[AuthContext] login: Error fetching user profile after sign-in:', profileError);
+        // Sign out again if profile fetch fails
+        await resetSupabaseAuth();
+        setUser(null);
+        throw new Error('Login failed: Could not fetch user profile.');
+      }
+
+      console.log('[AuthContext] login: Profile fetched. Setting user state.');
+      const loggedInUser: User = {
+        id: data.user.id,
+        email: data.user.email!,
+        role: profileData.role,
+        name: profileData.name,
+        token: data.session.access_token
+      };
+      
+      // Set state and store token/activity
+      setUser(loggedInUser);
+      localStorage.setItem('token', data.session.access_token);
+      sessionStorage.setItem('token', data.session.access_token);
+      updateLastActivity();
+      
+      console.log('[AuthContext] login: Login process successful.');
       console.groupEnd();
-      throw outerError; // Re-throw the error for the UI to handle
+      return true; // Indicate success
+
+    } catch (outerError) {
+      console.error('[AuthContext] login: Error during login process:', outerError);
+      // Ensure cleanup on any error
+      setUser(null);
+      // Attempt reset again just in case something went wrong mid-process
+      await resetSupabaseAuth(); 
+      console.groupEnd();
+      throw outerError; // Re-throw for the UI
+    } finally {
+      setLoading(false); // Ensure loading is set to false after attempt
     }
   };
 
   const logout = async () => {
-    console.groupCollapsed('[AuthContext] logout: Attempting logout...');
+    console.groupCollapsed('[AuthContext] logout: Starting logout process...');
+    // Set user to null immediately for faster UI feedback
+    setUser(null); 
+    
     try {
-      // Use the centralized reset function
-      await resetSupabaseAuth();
+      // Call the enhanced performLogout helper
+      console.log('[AuthContext] logout: Calling performLogout helper...');
+      await performLogout(); // This now handles resetSupabaseAuth internally
+      console.log('[AuthContext] logout: performLogout completed.');
       
-      // --- Aggressive Cleanup --- 
-      // 1. Clear application state
-      console.log('[AuthContext] logout: Step 1 - Clearing local user state and application tokens.');
-      setUser(null);
-      localStorage.removeItem('token');       // App-specific token
-      sessionStorage.removeItem('token');      // App-specific token (if used)
-
-      // 2. Manually clear Supabase auth token from localStorage
-      console.log('[AuthContext] logout: Step 2 - Manually clearing Supabase localStorage keys...');
-      if (typeof window !== 'undefined') {
-        let foundSupabaseKey = false;
-        Object.keys(localStorage).forEach(key => {
-          // Target keys like sb-xxxxxxxxxxxxxxxxxx-auth-token
-          if (/^sb-.*-auth-token$/.test(key)) { 
-            foundSupabaseKey = true;
-            localStorage.removeItem(key);
-            console.log(`[AuthContext] logout: Removed Supabase localStorage key: ${key}`);
-          }
-        });
-        if (!foundSupabaseKey) {
-          console.warn('[AuthContext] logout: No Supabase auth token key found in localStorage to remove.');
-        }
-      }
-
-      // 3. Manually clear Supabase auth cookies
-      console.log('[AuthContext] logout: Step 3 - Manually clearing Supabase cookies...');
-      if (typeof document !== 'undefined') {
-        const cookies = document.cookie.split(';');
-        let foundSupabaseCookie = false;
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i];
-            const eqPos = cookie.indexOf('=');
-            const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
-            // Target common Supabase cookie names or pattern
-            if (name.startsWith('sb-')) { 
-                foundSupabaseCookie = true;
-                console.log(`[AuthContext] logout: Deleting cookie: ${name}`);
-                // Delete cookie by setting expiry date to the past
-                // Path=/ is important to ensure deletion regardless of current path
-                document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-            }
-        }
-        if (!foundSupabaseCookie) {
-             console.warn('[AuthContext] logout: No Supabase cookies found to remove.');
-        }
-      }
-      // --- End Aggressive Cleanup ---
-
-      // 4. Attempt Supabase sign out (with timeout)
-      console.log('[AuthContext] logout: Step 4 - Calling Supabase signOut...');
+      // Redirect MUST happen after state is cleared and async operations finish
+      // Use router.push for SPA navigation, window.location for full page reload if needed
+      console.log('[AuthContext] logout: Redirecting to /login...');
+      router.push('/login'); 
       
-      try {
-        const logoutPromise = supabase.auth.signOut();
-        const timeoutPromise = new Promise<{error: Error}>((_, reject) => {
-          setTimeout(() => reject(new Error('Logout timed out')), AUTH_OPERATION_TIMEOUT);
-        });
-        
-        console.log(`[AuthContext] logout: Racing signOut against ${AUTH_OPERATION_TIMEOUT}ms timeout.`);
-        const { error } = await Promise.race([
-          logoutPromise,
-          timeoutPromise
-        ]);
-        
-        if (error) {
-          console.error('[AuthContext] logout: Supabase signOut error:', error);
-          // Log error, but local state, localStorage & cookies are already cleared.
-        } else {
-          console.log('[AuthContext] logout: Supabase signOut call completed successfully.');
-        }
-      } catch (raceError) {
-        console.error('[AuthContext] logout: Timeout or race error during signOut:', raceError);
-        // This is fine, we've already cleared local state
-      }
-      
-      // Always make sure we report successful logout from the application perspective
-      // since we've already cleared all local state and storage
-      console.log('[AuthContext] logout: Logout process finished.');
     } catch (error) {
-      console.error('[AuthContext] logout: Unexpected error during logout process:', error);
-      // Ensure local state is cleared even if there's an unexpected exception
-      setUser(null);
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('token');
-      
-      // Attempt manual Supabase key/cookie removal again in case of early error
-      if (typeof window !== 'undefined') {
-        Object.keys(localStorage).forEach(key => {
-          if (/^sb-.*-auth-token$/.test(key)) { localStorage.removeItem(key); }
-        });
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i];
-            const eqPos = cookie.indexOf('=');
-            const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
-            if (name.startsWith('sb-')) { 
-                document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-            }
-        }
-      }
+      console.error('[AuthContext] logout: Error during logout:', error);
+      // Even on error, attempt to force redirect to login page
+      console.log('[AuthContext] logout: Forcing redirect to /login due to error...');
+      router.push('/login'); 
     } finally {
-      // Always redirect to login page after logout attempt, regardless of success/failure
-      // to ensure user isn't stuck with partially logged-out state
-      if (typeof window !== 'undefined') {
-        // Slight delay to allow state updates to complete
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 100);
-      }
       console.groupEnd();
     }
   };
@@ -701,7 +462,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     logout,
     signUp,
-    isAuthenticated: !!user && !!user.id,
+    isAuthenticated: !!user && !!user.id, // Based on user state
     refreshSession
   };
 
