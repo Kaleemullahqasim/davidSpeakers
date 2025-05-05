@@ -10,11 +10,17 @@ if (!supabaseUrl || !supabaseKey) {
 // Determine the site URL for proper auth redirects
 const getSiteUrl = () => {
   if (typeof window === 'undefined') {
-    // Server-side: use environment variable with fallback
-    return process.env.NEXTAUTH_URL || 'http://localhost:3000';
+    // Server-side: prioritize different env vars for production vs local
+    if (process.env.NODE_ENV === 'production') {
+      // For production, use actual deployment URL with fallback to origin
+      return process.env.NEXT_PUBLIC_SITE_URL || 'https://david-speakers.vercel.app';
+    } else {
+      // For local development, use local URL
+      return process.env.NEXTAUTH_URL || 'http://localhost:3000';
+    }
   }
   
-  // Client-side: use the current origin
+  // Client-side: use the current origin (this is correct)
   return window.location.origin;
 };
 
@@ -25,8 +31,14 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
     persistSession: true,
     detectSessionInUrl: true,
     storageKey: 'david-speakers-auth-token', // Custom storage key for better isolation
-    // Ensure redirects work in both dev and production
-    site_url: getSiteUrl()
+    flowType: 'pkce'
+    // Removed invalid siteUrl property
+  },
+  global: {
+    // Set site URL at the global level instead
+    headers: {
+      'X-Site-URL': getSiteUrl()
+    }
   }
 });
 

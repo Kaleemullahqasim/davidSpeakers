@@ -48,17 +48,45 @@ export async function getAuthToken(): Promise<string | null> {
  * Refreshes the authentication token
  */
 export async function refreshToken(): Promise<string | null> {
-  // Add idle detection
+  // Add idle detection with more graceful handling
   const lastActivity = getLastActivity();
   const now = Date.now();
   const IDLE_THRESHOLD = 10 * 60 * 1000; // 10 minutes
   
-  // If we've been idle for too long in production, do a more aggressive reset
+  // For production idle periods: use a more graceful approach
   if (process.env.NODE_ENV === 'production' && 
       lastActivity && 
       (now - lastActivity > IDLE_THRESHOLD)) {
-    console.log('Long idle period detected in production, performing aggressive reset');
-    await resetSupabaseAuth();
+    console.log('Long idle period detected in production, attempting graceful refresh');
+    
+    try {
+      // Try a normal refresh first instead of aggressive reset
+      const { data } = await supabase.auth.refreshSession();
+      
+      // Only if refresh completely fails, then clean up local tokens
+      if (!data?.session) {
+        console.log('No session after refresh attempt during idle period');
+        if (isBrowser) {
+          localStorage.removeItem('token');
+          sessionStorage.removeItem('token');
+          // Return null to trigger re-login instead of aggressive reset
+          return null;
+        }
+      } else if (data?.session?.access_token) {
+        // Update stored tokens
+        if (isBrowser) {
+          localStorage.setItem('token', data.session.access_token);
+          sessionStorage.setItem('token', data.session.access_token);
+          // Also update last activity timestamp
+          localStorage.setItem('last-activity', now.toString());
+        }
+        console.log('Session successfully refreshed after idle period');
+        return data.session.access_token;
+      }
+    } catch (error) {
+      console.error('Error during idle refresh:', error);
+      // Continue to normal refresh flow instead of failing
+    }
   }
   
   // Don't allow multiple simultaneous refresh attempts
@@ -109,6 +137,8 @@ export async function refreshToken(): Promise<string | null> {
       if (isBrowser) {
         localStorage.setItem('token', data.session.access_token);
         sessionStorage.setItem('token', data.session.access_token);
+        // Also update the last activity timestamp
+        localStorage.setItem('last-activity', Date.now().toString());
       }
       
       console.log('Token refreshed successfully');
