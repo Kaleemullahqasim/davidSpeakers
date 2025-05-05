@@ -44,32 +44,63 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
 
 // Function to completely reset Supabase auth state
 export const resetSupabaseAuth = async () => {
-  // Clear localStorage
-  if (typeof window !== 'undefined') {
-    // Clear Supabase-specific storage
-    Object.keys(localStorage).forEach(key => {
-      if (key.startsWith('sb-')) {
-        localStorage.removeItem(key);
-      }
-    });
+  console.log('Starting complete Supabase auth reset...');
+  
+  try {
+    // First attempt to signOut to clear server-side state
+    // This is important to do first to ensure the server session is terminated
+    try {
+      console.log('Attempting to sign out from Supabase...');
+      await supabase.auth.signOut({ scope: 'global' });
+      console.log('Supabase signOut completed');
+    } catch (error) {
+      // Don't let signOut errors stop the cleanup process
+      console.error('Error during Supabase signOut:', error);
+    }
     
-    // Clear cookies
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i];
-      const eqPos = cookie.indexOf('=');
-      const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
-      if (name.startsWith('sb-')) { 
-        document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    // Clear localStorage
+    if (typeof window !== 'undefined') {
+      console.log('Clearing localStorage tokens and auth state...');
+      
+      // Clear application-specific tokens
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      localStorage.removeItem('last-activity');
+      
+      // Clear all Supabase-related storage (use broader pattern matching)
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('sb-') || 
+            key.includes('supabase') || 
+            key.includes('auth') ||
+            key.includes('david-speakers-auth')) {
+          console.log(`Removing localStorage key: ${key}`);
+          localStorage.removeItem(key);
+        }
+      });
+      
+      // Clear cookies with more thorough approach
+      console.log('Clearing auth-related cookies...');
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i];
+        const eqPos = cookie.indexOf('=');
+        const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+        if (name.startsWith('sb-') || name.includes('supabase') || name.includes('auth')) { 
+          // Set Path=/ to ensure cookie is properly cleared regardless of path
+          document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Lax; Secure;';
+        }
       }
     }
-  }
-  
-  // Force signOut to clear server-side state
-  try {
-    await supabase.auth.signOut({ scope: 'global' });
+    
+    // Important: Create a small delay to ensure all cleanup processes have completed
+    // This helps prevent race conditions with browser storage
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    console.log('Authentication state reset complete.');
+    return true;
   } catch (error) {
     console.error('Error during complete auth reset:', error);
+    return false;
   }
 };
 

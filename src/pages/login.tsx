@@ -19,6 +19,7 @@ export default function Login() {
   const { login, user, loading } = useAuth();
   const router = useRouter();
   const [authCheckTimeout, setAuthCheckTimeout] = useState(false);
+  const [recoveryInProgress, setRecoveryInProgress] = useState(false);
   
   // Handle extended auth check timeouts with more aggressive recovery
   useEffect(() => {
@@ -30,7 +31,7 @@ export default function Login() {
       if (loading) {
         setAuthCheckTimeout(true);
       }
-    }, hasReset ? 12000 : 8000); // Longer timeout if we're already attempted a reset
+    }, hasReset ? 12000 : 8000); // Longer timeout if we've already attempted a reset
     
     // Check for expired param which indicates session expired
     if (router.query.expired === 'true' && !error) {
@@ -40,55 +41,26 @@ export default function Login() {
     return () => clearTimeout(timeoutId);
   }, [loading, router.query, error]);
   
-  // Enhance handleForceRefresh function with more detailed recovery steps
+  // Enhanced recovery function with better visual feedback
   const handleForceRefresh = async () => {
     try {
-      setError(''); // Clear any existing errors
+      setRecoveryInProgress(true);
+      setError('Cleaning up authentication state...'); 
       setAuthCheckTimeout(false); // Hide the recovery UI while we're working
       
-      // Show a temporary processing message
-      const tempErrorId = setTimeout(() => {
-        setError('Cleaning up authentication state...');
-      }, 100);
-      
-      // Use the centralized reset function
+      // Complete auth reset with our improved function
       await resetSupabaseAuth();
       
-      // Also reset our own tokens
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('token');
-      localStorage.removeItem('last-activity');
-      
-      // Clean any other potential Supabase artifacts
-      if (typeof window !== 'undefined') {
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith('sb-') || key.includes('supabase')) {
-            localStorage.removeItem(key);
-          }
-        });
-        
-        // Clean cookies
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-          const cookie = cookies[i];
-          const eqPos = cookie.indexOf('=');
-          const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
-          if (name.startsWith('sb-')) { 
-            document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-          }
-        }
-      }
-      
-      clearTimeout(tempErrorId);
-      setError('Authentication reset successful. Reloading page...');
+      setError('Authentication reset successful! Reloading page...');
       
       // Force page reload after short delay to ensure cleanup is complete
       setTimeout(() => {
         window.location.href = '/login?reset=true';
-      }, 500);
+      }, 800);
     } catch (error) {
       console.error('Error during recovery:', error);
       setError('Recovery failed. Please try again or clear your browser cache.');
+      setRecoveryInProgress(false);
     }
   };
 
@@ -109,7 +81,7 @@ export default function Login() {
     }
   }, [user, loading, router]);
 
-  // Handle form submission
+  // Enhanced form submission with better error handling
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -118,12 +90,17 @@ export default function Login() {
     // Set a timeout to handle stuck login requests
     const loginTimeout = setTimeout(() => {
       if (isSubmitting) {
-        setError('Login is taking longer than expected. Please try again.');
+        setError('Login is taking longer than expected. Please try recovering your session below.');
         setIsSubmitting(false);
+        setAuthCheckTimeout(true); // Show recovery option
       }
-    }, 10000); // 10-second timeout for login operation
+    }, 8000); // 8-second timeout for login operation
     
     try {
+      // First do a light cleanup before attempting login
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      
       const user = await login(email, password);
       clearTimeout(loginTimeout);
       console.log('Login successful, user:', user);
@@ -132,7 +109,20 @@ export default function Login() {
     } catch (err) {
       clearTimeout(loginTimeout);
       console.error('Login error:', err);
-      setError(err instanceof Error ? err.message : 'Login failed. Please check your credentials.');
+      
+      // Provide more specific error messages based on error type
+      if (err instanceof Error) {
+        if (err.message.includes('timeout') || err.message.includes('network')) {
+          setError('Login request timed out or network error. Please try recovering your session.');
+          setAuthCheckTimeout(true); // Show recovery option
+        } else if (err.message.includes('Invalid login')) {
+          setError('Invalid email or password. Please check your credentials.');
+        } else {
+          setError(`Login failed: ${err.message}`);
+        }
+      } else {
+        setError('Login failed. Please check your credentials or try recovering your session.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -148,14 +138,28 @@ export default function Login() {
         </div>
         
         {authCheckTimeout && (
-          <div className="mt-6 text-center">
-            <p className="text-gray-600 mb-2">Authentication check is taking longer than usual.</p>
+          <div className="mt-6 text-center p-4 max-w-md">
+            <Alert variant="warning" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>Authentication check is taking longer than usual.</AlertDescription>
+            </Alert>
+            <p className="text-gray-600 mb-4">
+              This could be due to a stale session or network issues. Click below to clean up your session data and try again.
+            </p>
             <Button 
               onClick={handleForceRefresh} 
-              variant="outline" 
+              disabled={recoveryInProgress}
+              variant="outline"
               size="sm"
             >
-              Refresh Page
+              {recoveryInProgress ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Cleaning up...
+                </>
+              ) : (
+                'Recover Session'
+              )}
             </Button>
           </div>
         )}
@@ -186,6 +190,24 @@ export default function Login() {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
+
+              {authCheckTimeout && !isSubmitting && (
+                <Alert variant="warning" className="mb-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Having trouble logging in? 
+                    <Button 
+                      variant="link" 
+                      className="p-0 h-auto text-primary underline ml-1" 
+                      onClick={handleForceRefresh}
+                      disabled={recoveryInProgress}
+                    >
+                      {recoveryInProgress ? 'Recovering session...' : 'Recover your session'}
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
+              
               <form onSubmit={handleSubmit}>
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -214,7 +236,7 @@ export default function Login() {
                       required
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  <Button type="submit" className="w-full" disabled={isSubmitting || recoveryInProgress}>
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
