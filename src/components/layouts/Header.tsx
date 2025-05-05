@@ -36,22 +36,19 @@ export default function Header({ user }: HeaderProps) {
     try {
       setIsLoggingOut(true);
       
-      // Set a timeout to ensure the UI doesn't get stuck if logout takes too long
-      const logoutTimeout = setTimeout(() => {
-        console.warn('Logout is taking longer than expected, forcing client logout');
-        router.push('/login');
-      }, 5000); // 5-second fallback
-      
+      // Our updated logout system in AuthContext now handles everything including timeouts
+      // We no longer need to manage redirects here since the logout implementation 
+      // will handle them through window.location for more reliable page change
       await logout();
-      clearTimeout(logoutTimeout);
-      router.push('/login');
+      
+      // Note: We don't need to call router.push here anymore as the AuthContext logout 
+      // function now handles redirection via window.location for cleaner state reset
     } catch (error) {
-      console.error('Logout error:', error);
-      // Force client-side logout even if there was an error
+      console.error('Logout error in Header component:', error);
+      // If there's an error, still redirect to login as a fallback
       router.push('/login');
-    } finally {
-      setIsLoggingOut(false);
     }
+    // No need for finally block to reset isLoggingOut as page will redirect
   };
   
   // Get user initials for avatar

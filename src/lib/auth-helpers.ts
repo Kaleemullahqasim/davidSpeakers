@@ -4,9 +4,12 @@ import { supabase, resetSupabaseAuth } from './supabaseClient'; // Import the si
 const isBrowser = typeof window !== 'undefined';
 
 // Constants
-const AUTH_OPERATION_TIMEOUT = 15000; // 10 seconds
+const AUTH_OPERATION_TIMEOUT = 15000; // 15 seconds timeout for auth operations
 
+// Track if a token refresh is currently in progress to prevent multiple simultaneous attempts
 let isRefreshingToken = false;
+// Similarly track logout operations
+let isLoggingOut = false;
 
 export async function getAuthToken(): Promise<string | null> {
   try {
@@ -45,6 +48,24 @@ export async function getAuthToken(): Promise<string | null> {
 }
 
 /**
+ * Get the last activity timestamp from localStorage
+ */
+export function getLastActivity(): number | null {
+  if (!isBrowser) return null;
+  const lastActivity = localStorage.getItem('last-activity');
+  return lastActivity ? parseInt(lastActivity, 10) : null;
+}
+
+/**
+ * Update the last activity timestamp
+ */
+export function updateLastActivity(): void {
+  if (isBrowser) {
+    localStorage.setItem('last-activity', Date.now().toString());
+  }
+}
+
+/**
  * Refreshes the authentication token
  */
 export async function refreshToken(): Promise<string | null> {
@@ -57,7 +78,7 @@ export async function refreshToken(): Promise<string | null> {
   if (process.env.NODE_ENV === 'production' && 
       lastActivity && 
       (now - lastActivity > IDLE_THRESHOLD)) {
-    console.log('Long idle period detected in production, attempting graceful refresh');
+    console.log(`Long idle period detected (${Math.round((now - lastActivity)/1000/60)} minutes), attempting graceful refresh`);
     
     try {
       // Try a normal refresh first instead of aggressive reset
@@ -78,7 +99,7 @@ export async function refreshToken(): Promise<string | null> {
           localStorage.setItem('token', data.session.access_token);
           sessionStorage.setItem('token', data.session.access_token);
           // Also update last activity timestamp
-          localStorage.setItem('last-activity', now.toString());
+          updateLastActivity();
         }
         console.log('Session successfully refreshed after idle period');
         return data.session.access_token;
@@ -138,7 +159,7 @@ export async function refreshToken(): Promise<string | null> {
         localStorage.setItem('token', data.session.access_token);
         sessionStorage.setItem('token', data.session.access_token);
         // Also update the last activity timestamp
-        localStorage.setItem('last-activity', Date.now().toString());
+        updateLastActivity();
       }
       
       console.log('Token refreshed successfully');
@@ -338,9 +359,71 @@ export function getRoleRedirectPath(role: string): string {
   }
 }
 
-// Add this helper function
-function getLastActivity(): number | null {
-  if (!isBrowser) return null;
-  const lastActivity = localStorage.getItem('last-activity');
-  return lastActivity ? parseInt(lastActivity, 10) : null;
+/**
+ * Enhanced logout function that handles session cleanup
+ * This provides a more reliable logout mechanism especially after idle periods
+ */
+export async function performLogout(): Promise<boolean> {
+  if (isLoggingOut) {
+    console.log('Logout already in progress, waiting...');
+    return false;
+  }
+  
+  try {
+    isLoggingOut = true;
+    console.log('Performing logout with enhanced cleanup...');
+    
+    // 1. Clear all local state (tokens, etc) FIRST before any async operations
+    if (isBrowser) {
+      // Clear application tokens
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      localStorage.removeItem('last-activity');
+      
+      // Clear Supabase tokens from localStorage
+      Object.keys(localStorage).forEach(key => {
+        if (/^sb-.*-auth-token$/.test(key) || key.includes('supabase')) {
+          console.log(`Removing Supabase localStorage key: ${key}`);
+          localStorage.removeItem(key);
+        }
+      });
+      
+      // Clear cookies
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i];
+        const eqPos = cookie.indexOf('=');
+        const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+        if (name.startsWith('sb-')) { 
+          document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+        }
+      }
+    }
+    
+    // 2. After local cleanup, attempt Supabase signOut with timeout protection
+    try {
+      const logoutPromise = supabase.auth.signOut({ scope: 'global' });
+      const timeoutPromise = new Promise<{error: Error}>((_, reject) => {
+        setTimeout(() => reject(new Error('Logout timed out')), 5000); // Shorter timeout for logout
+      });
+      
+      await Promise.race([
+        logoutPromise,
+        timeoutPromise
+      ]);
+      
+      console.log('Logout successful');
+      return true;
+    } catch (error) {
+      console.error('Error or timeout during logout:', error);
+      // Even if the server-side signOut fails, we've already cleared client state
+      // so the user can still be considered logged out from the client's perspective
+      return true;
+    }
+  } catch (error) {
+    console.error('Unexpected error in performLogout:', error);
+    return false;
+  } finally {
+    isLoggingOut = false;
+  }
 }
