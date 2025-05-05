@@ -15,48 +15,6 @@ export default function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login, user, loading } = useAuth();
   const router = useRouter();
-  const [authCheckTimeout, setAuthCheckTimeout] = useState(false);
-  
-  // Handle extended auth check timeouts with more aggressive recovery
-  useEffect(() => {
-    // If loading takes too long, provide an option to retry
-    const timeoutId = setTimeout(() => {
-      if (loading) {
-        setAuthCheckTimeout(true);
-      }
-    }, 8000); // 8 seconds timeout for initial auth check
-    
-    return () => clearTimeout(timeoutId);
-  }, [loading]);
-  
-  // Handle forced refresh if authentication check is stuck
-  const handleForceRefresh = () => {
-    // Clear any potential stuck auth state before refreshing
-    localStorage.removeItem('token');
-    sessionStorage.removeItem('token');
-    
-    // Clear any Supabase-specific tokens
-    if (typeof window !== 'undefined') {
-      Object.keys(localStorage).forEach(key => {
-        if (/^sb-.*-auth-token$/.test(key)) {
-          localStorage.removeItem(key);
-        }
-      });
-      
-      // Clear cookies
-      const cookies = document.cookie.split(';');
-      for (let i = 0; i < cookies.length; i++) {
-        const cookie = cookies[i];
-        const eqPos = cookie.indexOf('=');
-        const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
-        if (name.startsWith('sb-')) { 
-          document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-        }
-      }
-    }
-    
-    window.location.reload();
-  };
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -81,22 +39,9 @@ export default function Login() {
     setError('');
     setIsSubmitting(true);
     
-    // Set a timeout to handle stuck login requests
-    const loginTimeout = setTimeout(() => {
-      if (isSubmitting) {
-        setError('Login is taking longer than expected. Please try again.');
-        setIsSubmitting(false);
-      }
-    }, 10000); // 10-second timeout for login operation
-    
     try {
-      const user = await login(email, password);
-      clearTimeout(loginTimeout);
-      console.log('Login successful, user:', user);
-      
-      // Router will handle redirect based on role in useEffect
+      await login(email, password);
     } catch (err) {
-      clearTimeout(loginTimeout);
       console.error('Login error:', err);
       setError(err instanceof Error ? err.message : 'Login failed. Please check your credentials.');
     } finally {
@@ -112,19 +57,6 @@ export default function Login() {
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <span className="ml-2">Checking authentication...</span>
         </div>
-        
-        {authCheckTimeout && (
-          <div className="mt-6 text-center">
-            <p className="text-gray-600 mb-2">Authentication check is taking longer than usual.</p>
-            <Button 
-              onClick={handleForceRefresh} 
-              variant="outline" 
-              size="sm"
-            >
-              Refresh Page
-            </Button>
-          </div>
-        )}
       </div>
     );
   }

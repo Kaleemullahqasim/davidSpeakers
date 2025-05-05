@@ -126,20 +126,20 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
   // Check if token is expired
   if (isTokenExpired(token)) {
     console.log('Token is expired, attempting to refresh...');
-    token = await refreshToken();
+    token = await refreshToken(); // refreshToken already handles its own storage updates/clearing
     
     if (!token) {
-      // Force logout if refresh fails
+      // Force logout if refresh fails - Rely on signOut and redirect
       if (isBrowser) {
-        localStorage.removeItem('token');
-        sessionStorage.removeItem('token');
-        // Clear any Supabase-specific storage
-        Object.keys(localStorage).forEach(key => {
-          if (/^sb-.*-auth-token$/.test(key)) {
-            localStorage.removeItem(key);
-          }
-        });
-        window.location.href = '/login?expired=true';
+        localStorage.removeItem('token'); // App token
+        sessionStorage.removeItem('token'); // App token
+        // REMOVED: Manual Supabase localStorage key clearing loop
+        
+        // Attempt a clean sign out via Supabase
+        supabase.auth.signOut().catch(err => console.error('fetchWithAuth: Supabase signOut error after failed refresh:', err));
+        
+        // Redirect to login
+        window.location.href = '/login?expired=true'; 
       }
       throw new Error('Session expired. Please log in again.');
     }
@@ -162,7 +162,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
     // If we get a 401 Unauthorized, try to refresh the token once
     if (response.status === 401) {
       console.log('Got 401 response, attempting to refresh token...');
-      const newToken = await refreshToken();
+      const newToken = await refreshToken(); // refreshToken handles its own storage updates/clearing
       
       if (newToken) {
         // Retry the request with the new token
@@ -174,16 +174,16 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
           }
         });
       } else {
-        // Force logout if refresh fails
+        // Force logout if refresh fails - Rely on signOut and redirect
         if (isBrowser) {
-          localStorage.removeItem('token');
-          sessionStorage.removeItem('token');
-          // Clear any Supabase-specific storage
-          Object.keys(localStorage).forEach(key => {
-            if (/^sb-.*-auth-token$/.test(key)) {
-              localStorage.removeItem(key);
-            }
-          });
+          localStorage.removeItem('token'); // App token
+          sessionStorage.removeItem('token'); // App token
+          // REMOVED: Manual Supabase localStorage key clearing loop
+          
+          // Attempt a clean sign out via Supabase
+          supabase.auth.signOut().catch(err => console.error('fetchWithAuth: Supabase signOut error after 401 refresh failure:', err));
+          
+          // Redirect to login
           window.location.href = '/login?expired=true';
         }
         throw new Error('Session expired during request. Please log in again.');
