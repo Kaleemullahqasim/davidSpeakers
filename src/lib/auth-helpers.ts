@@ -4,7 +4,9 @@ import { supabase } from './supabaseClient'; // Import the singleton instance
 const isBrowser = typeof window !== 'undefined';
 
 // Constants
-const AUTH_OPERATION_TIMEOUT = 10000; // 10 seconds
+const AUTH_OPERATION_TIMEOUT = 15000; // 10 seconds
+
+let isRefreshingToken = false;
 
 export async function getAuthToken(): Promise<string | null> {
   try {
@@ -46,7 +48,15 @@ export async function getAuthToken(): Promise<string | null> {
  * Refreshes the authentication token
  */
 export async function refreshToken(): Promise<string | null> {
+  // Don't allow multiple simultaneous refresh attempts
+  if (isRefreshingToken) {
+    console.log('Token refresh already in progress, waiting...');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return getAuthToken(); // Just get the current token instead of trying a new refresh
+  }
+  
   try {
+    isRefreshingToken = true;
     if (!supabase) {
       console.error('Supabase client not available (server-side render)');
       return null;
@@ -107,6 +117,9 @@ export async function refreshToken(): Promise<string | null> {
       sessionStorage.removeItem('token');
     }
     return null;
+  } finally {
+    // Always reset the flag when done
+    isRefreshingToken = false;
   }
 }
 

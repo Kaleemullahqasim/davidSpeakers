@@ -26,7 +26,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 // Constants for token refresh
-const AUTH_OPERATION_TIMEOUT = 10000; // 10 seconds timeout for auth operations
+const AUTH_OPERATION_TIMEOUT = 15000; // 10 seconds timeout for auth operations
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
