@@ -1,7 +1,7 @@
 import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { refreshToken, isTokenExpired } from '../lib/auth-helpers';
 import { useRouter } from 'next/router';
-import { supabase } from '../lib/supabaseClient'; // Import the singleton instance
+import { supabase, resetSupabaseAuth, updateUserActivity } from '../lib/supabaseClient'; // Updated to use lib version
 
 // Define the user type with role information
 interface User {
@@ -26,7 +26,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 // Constants for token refresh
-const AUTH_OPERATION_TIMEOUT = 10000; // 10 seconds timeout for auth operations
+const AUTH_OPERATION_TIMEOUT = 15000; // 10 seconds timeout for auth operations
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -341,27 +341,108 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authListener?.subscription.unsubscribe();
     };
   }, []); // Only run on mount
+
+  // Track user activity
+  useEffect(() => {
+    if (typeof window !== 'undefined' && user) {
+      // Update activity timestamp on user interaction
+      const handleActivity = () => updateUserActivity();
+      
+      ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(event => {
+        window.addEventListener(event, handleActivity, { passive: true });
+      });
+      
+      return () => {
+        ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(event => {
+          window.removeEventListener(event, handleActivity);
+        });
+      };
+    }
+  }, [user]);
   
+  // Helper function to get last activity timestamp for idle detection
+  const getLastActivityTime = (): number | null => {
+    if (typeof window === 'undefined') return null;
+    const lastActivity = localStorage.getItem('last-activity');
+    return lastActivity ? parseInt(lastActivity, 10) : null;
+  };
+
   const login = async (email: string, password: string) => {
     console.groupCollapsed(`[AuthContext] login: Attempting login for ${email}...`);
     try {
+      // Production-specific handling for login after idle periods
+      if (process.env.NODE_ENV === 'production') {
+        console.log('[AuthContext] login: Production environment detected');
+        
+        // Check if we're coming back from idle - this approach is more targeted than
+        // always doing resetSupabaseAuth which can break the login flow
+        const lastActivity = getLastActivityTime();
+        const now = Date.now();
+        const idleThreshold = 10 * 60 * 1000; // 10 minutes
+        
+        if (lastActivity && (now - lastActivity > idleThreshold)) {
+          console.log(`[AuthContext] login: Detected login after long idle period (${Math.round((now - lastActivity)/1000/60)} minutes)`);
+          
+          // Clear only our application's tokens first
+          localStorage.removeItem('token');
+          sessionStorage.removeItem('token');
+          
+          try {
+            // For production idle period logins, try a more careful approach
+            // First try a refresh rather than a complete reset
+            const { data } = await supabase.auth.refreshSession();
+            
+            if (!data?.session) {
+              console.log('[AuthContext] login: No valid session after refresh, will proceed with clean login');
+              // Wait a moment before continuing with clean state
+              await new Promise(resolve => setTimeout(resolve, 300));
+              
+              // Now do a focused cleanup rather than full reset
+              if (typeof window !== 'undefined') {
+                Object.keys(localStorage).forEach(key => {
+                  if (/^sb-.*-auth-token$/.test(key)) {
+                    console.log(`[AuthContext] login: Removing stale token: ${key}`);
+                    localStorage.removeItem(key);
+                  }
+                });
+              }
+            } else {
+              console.log('[AuthContext] login: Successfully refreshed session, continuing with login');
+            }
+          } catch (refreshError) {
+            console.error('[AuthContext] login: Error during pre-login refresh:', refreshError);
+            // Continue with login process after error
+          }
+        } else {
+          console.log('[AuthContext] login: No long idle period detected, proceeding with standard login');
+          // For regular (non-idle) logins in production or local dev, do a clean reset
+          await resetSupabaseAuth();
+        }
+      } else {
+        // For local development, continue with existing full reset approach
+        await resetSupabaseAuth();
+      }
+      
       console.log('[AuthContext] login: Calling supabase.auth.signInWithPassword()...');
       
-      // Clean up any existing tokens first to avoid conflicts
+      // Clean up any existing tokens
       localStorage.removeItem('token');
       sessionStorage.removeItem('token');
-      if (typeof window !== 'undefined') {
-        Object.keys(localStorage).forEach(key => { 
-          if (/^sb-.*-auth-token$/.test(key)) { 
-            localStorage.removeItem(key);
-          }
-        });
-      }
+      
+      // Use a more reliable approach for production environments
+      const isProduction = process.env.NODE_ENV === 'production';
+      const loginOptions = isProduction 
+        ? { 
+            redirectTo: window.location.origin,
+            shouldCreateUser: false // Don't try to create new users on login
+          } 
+        : undefined;
       
       // Create a Promise to handle the login request with a timeout
       const loginPromise = supabase.auth.signInWithPassword({
         email,
-        password
+        password,
+        ...loginOptions
       });
       
       console.log(`[AuthContext] login: Racing signInWithPassword against ${AUTH_OPERATION_TIMEOUT}ms timeout.`);
@@ -410,6 +491,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('token', data.session.access_token);
         sessionStorage.setItem('token', data.session.access_token);
         
+        // Store last activity timestamp on successful login
+        updateUserActivity();
+        
         // Return minimal success indicator
         console.groupEnd();
         return true; // Indicate success
@@ -451,6 +535,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     console.groupCollapsed('[AuthContext] logout: Attempting logout...');
     try {
+      // Use the centralized reset function
+      await resetSupabaseAuth();
+      
       // --- Aggressive Cleanup --- 
       // 1. Clear application state
       console.log('[AuthContext] logout: Step 1 - Clearing local user state and application tokens.');

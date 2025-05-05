@@ -8,6 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2, Mic } from 'lucide-react';
 
+// Import resetSupabaseAuth
+import { resetSupabaseAuth } from '@/lib/supabaseClient';
+
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,43 +22,74 @@ export default function Login() {
   
   // Handle extended auth check timeouts with more aggressive recovery
   useEffect(() => {
+    // Add URL query param check to detect if we're coming from a recovery attempt
+    const hasReset = router.query.reset === 'true';
+    
     // If loading takes too long, provide an option to retry
     const timeoutId = setTimeout(() => {
       if (loading) {
         setAuthCheckTimeout(true);
       }
-    }, 8000); // 8 seconds timeout for initial auth check
+    }, hasReset ? 12000 : 8000); // Longer timeout if we're already attempted a reset
     
-    return () => clearTimeout(timeoutId);
-  }, [loading]);
-  
-  // Handle forced refresh if authentication check is stuck
-  const handleForceRefresh = () => {
-    // Clear any potential stuck auth state before refreshing
-    localStorage.removeItem('token');
-    sessionStorage.removeItem('token');
-    
-    // Clear any Supabase-specific tokens
-    if (typeof window !== 'undefined') {
-      Object.keys(localStorage).forEach(key => {
-        if (/^sb-.*-auth-token$/.test(key)) {
-          localStorage.removeItem(key);
-        }
-      });
-      
-      // Clear cookies
-      const cookies = document.cookie.split(';');
-      for (let i = 0; i < cookies.length; i++) {
-        const cookie = cookies[i];
-        const eqPos = cookie.indexOf('=');
-        const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
-        if (name.startsWith('sb-')) { 
-          document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-        }
-      }
+    // Check for expired param which indicates session expired
+    if (router.query.expired === 'true' && !error) {
+      setError('Your session has expired. Please log in again.');
     }
     
-    window.location.reload();
+    return () => clearTimeout(timeoutId);
+  }, [loading, router.query, error]);
+  
+  // Enhance handleForceRefresh function with more detailed recovery steps
+  const handleForceRefresh = async () => {
+    try {
+      setError(''); // Clear any existing errors
+      setAuthCheckTimeout(false); // Hide the recovery UI while we're working
+      
+      // Show a temporary processing message
+      const tempErrorId = setTimeout(() => {
+        setError('Cleaning up authentication state...');
+      }, 100);
+      
+      // Use the centralized reset function
+      await resetSupabaseAuth();
+      
+      // Also reset our own tokens
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      localStorage.removeItem('last-activity');
+      
+      // Clean any other potential Supabase artifacts
+      if (typeof window !== 'undefined') {
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('sb-') || key.includes('supabase')) {
+            localStorage.removeItem(key);
+          }
+        });
+        
+        // Clean cookies
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i];
+          const eqPos = cookie.indexOf('=');
+          const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+          if (name.startsWith('sb-')) { 
+            document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+          }
+        }
+      }
+      
+      clearTimeout(tempErrorId);
+      setError('Authentication reset successful. Reloading page...');
+      
+      // Force page reload after short delay to ensure cleanup is complete
+      setTimeout(() => {
+        window.location.href = '/login?reset=true';
+      }, 500);
+    } catch (error) {
+      console.error('Error during recovery:', error);
+      setError('Recovery failed. Please try again or clear your browser cache.');
+    }
   };
 
   // Redirect if already authenticated
