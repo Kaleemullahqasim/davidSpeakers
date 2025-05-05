@@ -1,12 +1,10 @@
-import { supabase, resetSupabaseAuth } from './supabaseClient'; // Import the singleton instance
+import { supabase } from './supabaseClient'; // Import the singleton instance
 
 // Check if we're in the browser environment
 const isBrowser = typeof window !== 'undefined';
 
 // Constants
-const AUTH_OPERATION_TIMEOUT = 15000; // 10 seconds
-
-let isRefreshingToken = false;
+const AUTH_OPERATION_TIMEOUT = 10000; // 10 seconds
 
 export async function getAuthToken(): Promise<string | null> {
   try {
@@ -48,56 +46,7 @@ export async function getAuthToken(): Promise<string | null> {
  * Refreshes the authentication token
  */
 export async function refreshToken(): Promise<string | null> {
-  // Add idle detection with more graceful handling
-  const lastActivity = getLastActivity();
-  const now = Date.now();
-  const IDLE_THRESHOLD = 10 * 60 * 1000; // 10 minutes
-  
-  // For production idle periods: use a more graceful approach
-  if (process.env.NODE_ENV === 'production' && 
-      lastActivity && 
-      (now - lastActivity > IDLE_THRESHOLD)) {
-    console.log('Long idle period detected in production, attempting graceful refresh');
-    
-    try {
-      // Try a normal refresh first instead of aggressive reset
-      const { data } = await supabase.auth.refreshSession();
-      
-      // Only if refresh completely fails, then clean up local tokens
-      if (!data?.session) {
-        console.log('No session after refresh attempt during idle period');
-        if (isBrowser) {
-          localStorage.removeItem('token');
-          sessionStorage.removeItem('token');
-          // Return null to trigger re-login instead of aggressive reset
-          return null;
-        }
-      } else if (data?.session?.access_token) {
-        // Update stored tokens
-        if (isBrowser) {
-          localStorage.setItem('token', data.session.access_token);
-          sessionStorage.setItem('token', data.session.access_token);
-          // Also update last activity timestamp
-          localStorage.setItem('last-activity', now.toString());
-        }
-        console.log('Session successfully refreshed after idle period');
-        return data.session.access_token;
-      }
-    } catch (error) {
-      console.error('Error during idle refresh:', error);
-      // Continue to normal refresh flow instead of failing
-    }
-  }
-  
-  // Don't allow multiple simultaneous refresh attempts
-  if (isRefreshingToken) {
-    console.log('Token refresh already in progress, waiting...');
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return getAuthToken(); // Just get the current token instead of trying a new refresh
-  }
-  
   try {
-    isRefreshingToken = true;
     if (!supabase) {
       console.error('Supabase client not available (server-side render)');
       return null;
@@ -137,8 +86,6 @@ export async function refreshToken(): Promise<string | null> {
       if (isBrowser) {
         localStorage.setItem('token', data.session.access_token);
         sessionStorage.setItem('token', data.session.access_token);
-        // Also update the last activity timestamp
-        localStorage.setItem('last-activity', Date.now().toString());
       }
       
       console.log('Token refreshed successfully');
@@ -160,9 +107,6 @@ export async function refreshToken(): Promise<string | null> {
       sessionStorage.removeItem('token');
     }
     return null;
-  } finally {
-    // Always reset the flag when done
-    isRefreshingToken = false;
   }
 }
 
@@ -336,11 +280,4 @@ export function getRoleRedirectPath(role: string): string {
     default:
       return '/dashboard';
   }
-}
-
-// Add this helper function
-function getLastActivity(): number | null {
-  if (!isBrowser) return null;
-  const lastActivity = localStorage.getItem('last-activity');
-  return lastActivity ? parseInt(lastActivity, 10) : null;
 }

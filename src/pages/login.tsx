@@ -8,9 +8,6 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2, Mic } from 'lucide-react';
 
-// Import resetSupabaseAuth
-import { resetSupabaseAuth } from '@/lib/supabaseClient';
-
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,84 +16,51 @@ export default function Login() {
   const { login, user, loading } = useAuth();
   const router = useRouter();
   const [authCheckTimeout, setAuthCheckTimeout] = useState(false);
-  const [recoveryInProgress, setRecoveryInProgress] = useState(false);
   
   // Handle extended auth check timeouts with more aggressive recovery
   useEffect(() => {
-    // Add URL query param check to detect if we're coming from a recovery attempt
-    const hasReset = router.query.reset === 'true';
-    
     // If loading takes too long, provide an option to retry
     const timeoutId = setTimeout(() => {
       if (loading) {
         setAuthCheckTimeout(true);
       }
-    }, hasReset ? 12000 : 8000); // Longer timeout if we're already attempted a reset
-    
-    // Check for expired param which indicates session expired
-    if (router.query.expired === 'true' && !error) {
-      setError('Your session has expired. Please log in again.');
-    }
+    }, 8000); // 8 seconds timeout for initial auth check
     
     return () => clearTimeout(timeoutId);
-  }, [loading, router.query, error]);
+  }, [loading]);
   
-  // Enhance handleForceRefresh function with more detailed recovery steps
-  const handleForceRefresh = async () => {
-    try {
-      setError(''); // Clear any existing errors
-      setAuthCheckTimeout(false); // Hide the recovery UI while we're working
+  // Handle forced refresh if authentication check is stuck
+  const handleForceRefresh = () => {
+    // Clear any potential stuck auth state before refreshing
+    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
+    
+    // Clear any Supabase-specific tokens
+    if (typeof window !== 'undefined') {
+      Object.keys(localStorage).forEach(key => {
+        if (/^sb-.*-auth-token$/.test(key)) {
+          localStorage.removeItem(key);
+        }
+      });
       
-      // Show a temporary processing message
-      const tempErrorId = setTimeout(() => {
-        setError('Cleaning up authentication state...');
-      }, 100);
-      
-      // Use the centralized reset function
-      await resetSupabaseAuth();
-      
-      // Also reset our own tokens
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('token');
-      localStorage.removeItem('last-activity');
-      
-      // Clean any other potential Supabase artifacts
-      if (typeof window !== 'undefined') {
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith('sb-') || key.includes('supabase')) {
-            localStorage.removeItem(key);
-          }
-        });
-        
-        // Clean cookies
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-          const cookie = cookies[i];
-          const eqPos = cookie.indexOf('=');
-          const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
-          if (name.startsWith('sb-')) { 
-            document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-          }
+      // Clear cookies
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i];
+        const eqPos = cookie.indexOf('=');
+        const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+        if (name.startsWith('sb-')) { 
+          document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
         }
       }
-      
-      clearTimeout(tempErrorId);
-      setError('Authentication reset successful. Reloading page...');
-      
-      // Force page reload after short delay to ensure cleanup is complete
-      setTimeout(() => {
-        window.location.href = '/login?reset=true';
-      }, 500);
-    } catch (error) {
-      console.error('Error during recovery:', error);
-      setError('Recovery failed. Please try again or clear your browser cache.');
     }
+    
+    window.location.reload();
   };
 
   // Redirect if already authenticated
   useEffect(() => {
     if (!loading && user) {
-      console.log('[Login Page] User detected, redirecting...');
       // Redirect based on user role
       if (user.role === 'admin') {
         router.push('/dashboard/admin');
@@ -108,8 +72,6 @@ export default function Login() {
         // Fallback for unknown roles
         router.push('/dashboard');
       }
-    } else if (!loading && !user) {
-      console.log('[Login Page] No user detected, showing login form.');
     }
   }, [user, loading, router]);
 
@@ -118,32 +80,25 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
-    setAuthCheckTimeout(false); // Reset recovery prompt on new attempt
+    
+    // Set a timeout to handle stuck login requests
+    const loginTimeout = setTimeout(() => {
+      if (isSubmitting) {
+        setError('Login is taking longer than expected. Please try again.');
+        setIsSubmitting(false);
+      }
+    }, 10000); // 10-second timeout for login operation
     
     try {
-      // login function now returns boolean
-      const success = await login(email, password); 
+      const user = await login(email, password);
+      clearTimeout(loginTimeout);
+      console.log('Login successful, user:', user);
       
-      if (success) {
-        console.log('[Login Page] Login successful, waiting for redirect...');
-        // Redirect is handled by the useEffect watching `user` state
-      } else {
-         // This case might not happen if login throws errors, but handle defensively
-         setError('Login failed. Please try again.');
-      }
-    } catch (err: any) {
-      console.error('[Login Page] Login error:', err);
-      // Provide more specific error messages
-      if (err.message.includes('timed out')) {
-        setError('Login request timed out. Please check your connection or try recovering session.');
-        setAuthCheckTimeout(true); // Show recovery option on timeout
-      } else if (err.message.includes('Invalid login credentials')) { // Check for Supabase specific error
-        setError('Invalid email or password.');
-      } else if (err.message.includes('fetch user profile')) {
-         setError('Login succeeded but failed to load profile. Please try again.');
-      } else {
-        setError(`Login failed: ${err.message || 'Please try again.'}`);
-      }
+      // Router will handle redirect based on role in useEffect
+    } catch (err) {
+      clearTimeout(loginTimeout);
+      console.error('Login error:', err);
+      setError(err instanceof Error ? err.message : 'Login failed. Please check your credentials.');
     } finally {
       setIsSubmitting(false);
     }
@@ -159,7 +114,7 @@ export default function Login() {
         </div>
         
         {authCheckTimeout && (
-          <div className="mt-6 text-center p-4 max-w-md">
+          <div className="mt-6 text-center">
             <p className="text-gray-600 mb-2">Authentication check is taking longer than usual.</p>
             <Button 
               onClick={handleForceRefresh} 
@@ -197,14 +152,6 @@ export default function Login() {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
-              {authCheckTimeout && !isSubmitting && (
-                <Alert variant="warning" className="mb-4">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    Login request timed out. Please check your connection or try recovering session.
-                  </AlertDescription>
-                </Alert>
-              )}
               <form onSubmit={handleSubmit}>
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -233,7 +180,7 @@ export default function Login() {
                       required
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={isSubmitting || recoveryInProgress}>
+                  <Button type="submit" className="w-full" disabled={isSubmitting}>
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
