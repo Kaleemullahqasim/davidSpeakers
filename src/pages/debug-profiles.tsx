@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { syncAuthToken } from '@/lib/auth-helpers';
 import { supabase } from '@/lib/supabaseClient';
-import { create_profiles_table } from '../sql/create-profiles-table'; // SQL string for creating the table
 
 export default function DebugProfiles() {
   const { user, loading, loadUser } = useAuth();
@@ -300,4 +299,4 @@ CREATE TRIGGER update_profiles_updated_at
   BEFORE UPDATE ON public.profiles
   FOR EACH ROW
   EXECUTE PROCEDURE update_updated_at_column();
-`; 
+`;
