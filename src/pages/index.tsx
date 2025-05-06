@@ -13,13 +13,12 @@ export default function Home() {
     setIsMounted(true);
   }, []);
   
-  // Only access auth on the client side
+  // Call useAuth at the top level of the component
+  const { user, loading } = useAuth();
+
+  // Only use auth state when mounted (client-side)
   useEffect(() => {
-    if (isMounted) {
-      // Safe to use auth context now
-      const { user, loading } = useAuth();
-      
-    if (!loading && user) {
+    if (isMounted && !loading && user) {
       if (user.role === 'student') {
         router.push('/dashboard/student');
       } else if (user.role === 'coach') {
@@ -28,8 +27,7 @@ export default function Home() {
         router.push('/dashboard/admin');
       }
     }
-    }
-  }, [isMounted, router]);
+  }, [isMounted, user, loading, router]);
 
   // Simple render that doesn't depend on auth context
   return (
@@ -47,7 +45,7 @@ export default function Home() {
   );
 }
 
-// Add getServerSideProps to avoid static generation
+// Add getServerSideProps to ensure the page is dynamically rendered
 export async function getServerSideProps() {
   return {
     props: {}, // will be passed to the page component as props
