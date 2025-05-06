@@ -1,36 +1,48 @@
 import { YoutubeTranscript } from 'youtube-transcript';
 
 /**
- * Decodes HTML entities in a string
+ * Decodes HTML entities in a string - Node.js compatible version
  * @param text The text with HTML entities to decode
  * @returns The decoded text
  */
 function decodeHtmlEntities(text: string): string {
-  // Create a temporary element to use the browser's built-in HTML entity decoding
-  const doc = new DOMParser().parseFromString(text, 'text/html');
-  return doc.body.textContent || '';
+  // Basic Node.js compatible HTML entity decoding
+  // For more robust decoding, consider a library like 'he'
+  if (!text) return '';
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'"); // &apos; is also common
 }
 
 export async function getYouTubeTranscript(videoId: string): Promise<string | null> {
+  console.log(`[youtubeTranscription] Attempting to fetch transcript for videoId: ${videoId}`);
   try {
-    // Get transcript segments from the YouTube API
     const transcriptSegments = await YoutubeTranscript.fetchTranscript(videoId);
-    
+
     if (!transcriptSegments || transcriptSegments.length === 0) {
-      throw new Error('No transcript found for this video');
+      console.warn(`[youtubeTranscription] No transcript segments found for videoId: ${videoId}`);
+      return null;
     }
-    
-    // Combine all segments into a single text
-    const fullTranscript = transcriptSegments
-      .map((segment: any) => segment.text)
-      .join(' ')
-      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-      .trim();
-    
-    return fullTranscript;
-  } catch (error) {
-    console.error('Error fetching YouTube transcript:', error);
-    return null;
+
+    const fullTranscript = transcriptSegments.map(segment => segment.text).join(' ');
+    console.log(`[youtubeTranscription] Successfully fetched and combined transcript for videoId: ${videoId}. Length: ${fullTranscript.length}`);
+    // Ensure decoding happens correctly
+    return decodeHtmlEntities(fullTranscript);
+  } catch (error: any) {
+    console.error(`[youtubeTranscription] Error fetching transcript for videoId: ${videoId}. Error:`, error);
+    // Log more details from the error object if available
+    if (error.message) {
+      console.error(`[youtubeTranscription] Error message: ${error.message}`);
+    }
+    if (error.stack) {
+      console.error(`[youtubeTranscription] Error stack: ${error.stack}`);
+    }
+    // You might want to re-throw or handle this error in a way that the calling function knows it failed
+    throw new Error(`Failed to get YouTube transcript for videoId ${videoId}: ${error.message || 'Unknown error'}`);
   }
 }
 
@@ -64,46 +76,19 @@ export async function getYouTubeVideoDetails(videoId: string) {
  * @returns A promise that resolves to the transcript text
  */
 export async function transcribeYouTubeVideo(videoId: string): Promise<string> {
+  console.log(`[youtubeTranscription] Starting transcribeYouTubeVideo for videoId: ${videoId}`);
   try {
-    console.log(`Starting transcription for video ID: ${videoId}`);
-    
-    // Fetch transcript using the correct method according to documentation
-    const transcriptResponse = await YoutubeTranscript.fetchTranscript(videoId);
-    
-    if (!transcriptResponse || transcriptResponse.length === 0) {
-      throw new Error('No transcript found for this video');
+    const transcript = await getYouTubeTranscript(videoId);
+    if (transcript === null) {
+      console.error(`[youtubeTranscription] Transcription returned null for videoId: ${videoId}`);
+      throw new Error('Transcription resulted in null, possibly no captions or an error.');
     }
-    
-    console.log(`Received transcript with ${transcriptResponse.length} segments`);
-    
-    // Combine all transcript segments into a single string
-    let fullTranscript = transcriptResponse
-      .map((segment: any) => segment.text)
-      .join(' ')
-      .replace(/\s+/g, ' ') // Replace multiple spaces with a single space
-      .trim();
-    
-    // Clean up HTML entities like &amp;#39; (which should be apostrophes)
-    // First, replace known patterns
-    fullTranscript = fullTranscript
-      .replace(/&amp;#39;/g, "'")       // Replace &amp;#39; with apostrophe
-      .replace(/&#39;/g, "'")           // Replace &#39; with apostrophe
-      .replace(/&quot;/g, '"')          // Replace &quot; with double quote
-      .replace(/&amp;/g, '&')           // Replace &amp; with &
-      .replace(/&lt;/g, '<')            // Replace &lt; with <
-      .replace(/&gt;/g, '>')            // Replace &gt; with >
-      .replace(/\s+/g, ' ')             // Clean up any extra spaces created in replacements
-      .trim();
-    
-    // If we're in a browser environment, use the DOM to decode any remaining entities
-    if (typeof window !== 'undefined') {
-      fullTranscript = decodeHtmlEntities(fullTranscript);
-    }
-    
-    return fullTranscript;
-  } catch (error) {
-    console.error('Error getting YouTube transcript:', error);
-    throw new Error(`Failed to get transcript: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.log(`[youtubeTranscription] Transcription successful for videoId: ${videoId}`);
+    return transcript;
+  } catch (error: any) {
+    console.error(`[youtubeTranscription] Error in transcribeYouTubeVideo for videoId: ${videoId}. Error:`, error.message);
+    // Re-throw to be caught by the API route
+    throw error;
   }
 }
 
