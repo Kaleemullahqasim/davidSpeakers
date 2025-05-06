@@ -35,7 +35,7 @@ export function ProfileDebugger() {
     try {
       // Update the profile with the new role
       const { error } = await supabase
-        .from('profiles')
+        .from('users')
         .update({ role })
         .eq('id', user.id);
       

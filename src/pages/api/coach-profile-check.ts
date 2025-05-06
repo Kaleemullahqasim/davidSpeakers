@@ -28,7 +28,7 @@ export default async function coachProfileCheck(req: NextApiRequest, res: NextAp
     
     // Check if profile exists in profiles table
     const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
+      .from('users')
       .select('*')
       .eq('id', userId)
       .single();

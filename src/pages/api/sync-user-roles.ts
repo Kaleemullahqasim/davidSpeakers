@@ -49,7 +49,7 @@ export default async function syncUserRoles(req: NextApiRequest, res: NextApiRes
     
     // Update the profile in the profiles table
     const { data: profileUpdateData, error: profileUpdateError } = await supabase
-      .from('profiles')
+      .from('users')
       .upsert({
         id: userId,
         email: userEmail,

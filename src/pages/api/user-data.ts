@@ -5,7 +5,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   return withAuth(req, res, async (user, supabase) => {
     // Example: Get user profile data
     const { data, error } = await supabase
-      .from('profiles')
+      .from('users')
       .select('*')
       .eq('id', user.id)
       .single()

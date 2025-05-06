@@ -25,7 +25,7 @@ export default async function fixProfiles(req: NextApiRequest, res: NextApiRespo
     }
 
     // First ensure the profiles table exists
-    const { error: tableError } = await supabase.from('profiles').select('id').limit(1);
+    const { error: tableError } = await supabase.from('users').select('id').limit(1);
     
     if (tableError && tableError.code === '42P01') { // Table does not exist
       return res.status(500).json({ 
@@ -46,7 +46,7 @@ export default async function fixProfiles(req: NextApiRequest, res: NextApiRespo
     
     // Fetch all profiles
     const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
+      .from('users')
       .select('*');
     
     if (profilesError) {
@@ -126,7 +126,7 @@ export default async function fixProfiles(req: NextApiRequest, res: NextApiRespo
       
       for (const user of usersToFix) {
         const { error } = await supabase
-          .from('profiles')
+          .from('users')
           .upsert({
             id: user.id,
             email: user.email,

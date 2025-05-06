@@ -130,7 +130,7 @@ export async function fetchCoachEvaluations(coachId: string): Promise<Evaluation
   try {
     // Try to verify coach role first for debugging
     const { data: userData, error: userError } = await supabase
-      .from('profiles')
+      .from('users')
       .select('role')
       .eq('id', coachId)
       .single();

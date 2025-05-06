@@ -27,7 +27,7 @@ export default async function checkProfile(req: NextApiRequest, res: NextApiResp
     
     // Check if profile exists
     const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
+      .from('users')
       .select('*')
       .eq('id', userId)
       .single();

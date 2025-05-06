@@ -34,7 +34,7 @@ export default async function createTestUsers(req: NextApiRequest, res: NextApiR
       // Check if user already exists (signUp might return a user even if it exists)
       if (adminData?.user) {
         // Create or update the profile
-        const { error: profileError } = await supabase.from('profiles').upsert({
+        const { error: profileError } = await supabase.from('users').upsert({
           id: adminData.user.id,
           email: 'admin@davidspeaker.com',
           name: 'Admin User',
@@ -71,7 +71,7 @@ export default async function createTestUsers(req: NextApiRequest, res: NextApiR
       // Check if user already exists
       if (coachData?.user) {
         // Create or update the profile
-        const { error: profileError } = await supabase.from('profiles').upsert({
+        const { error: profileError } = await supabase.from('users').upsert({
           id: coachData.user.id,
           email: 'coach@davidspeaker.com',
           name: 'Coach User',
@@ -108,7 +108,7 @@ export default async function createTestUsers(req: NextApiRequest, res: NextApiR
       // Check if user already exists
       if (studentData?.user) {
         // Create or update the profile
-        const { error: profileError } = await supabase.from('profiles').upsert({
+        const { error: profileError } = await supabase.from('users').upsert({
           id: studentData.user.id,
           email: 'student@davidspeaker.com',
           name: 'Student User',
