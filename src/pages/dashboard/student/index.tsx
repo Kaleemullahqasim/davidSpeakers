@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { fetchUserEvaluations } from '@/lib/api';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
@@ -43,25 +43,35 @@ import {
 
 const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444'];
 
+// Add a type assertion to fix property access
+type ExtendedUser = {
+  id: string;
+  email?: string;
+  name?: string;
+  role?: string;
+};
+
 export default function StudentDashboard() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
-  
-  // Mount effect to prevent hydration errors
+
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Fetch evaluations for the logged-in student
-  const { data: evaluations, isLoading: evaluationsLoading, error } = useQuery({
-    queryKey: ['user-evaluations', user?.id],
+  const { 
+    data: evaluations, 
+    isLoading: evaluationsLoading, 
+    error 
+  } = useQuery({
+    queryKey: ['student-evaluations', user?.id],
     queryFn: () => fetchUserEvaluations(user?.id as string),
-    enabled: !!user?.id && user?.role === 'student',
-    refetchInterval: 15000, // Refresh every 15 seconds to check for updates
+    enabled: !!user?.id && mounted, // Ensure user and mount before fetching
+    refetchInterval: 30000, // Refetch every 30 seconds
   });
-  
+
   // Log any errors for debugging
   useEffect(() => {
     if (error) {
@@ -76,13 +86,13 @@ export default function StudentDashboard() {
 
   // Filter evaluations by status
   const pendingEvaluations = evaluations?.filter(
-    evaluation => ['pending', 'review_requested'].includes(evaluation.status)
+    evaluation => ['pending', 'review_requested', 'coach_reviewing', 'ai_processing'].includes(evaluation.status) // Broader pending states
   ) || [];
   
   const completedEvaluations = evaluations?.filter(
-    evaluation => ['completed', 'reviewed'].includes(evaluation.status)
+    evaluation => ['completed', 'reviewed', 'published'].includes(evaluation.status) // Use published/reviewed
   ) || [];
-  
+
   // All evaluations that have been completed, sorted by date
   const recentEvaluations = [...(completedEvaluations || [])]
     .sort((a, b) => new Date(b.completed_at || b.created_at).getTime() - 
@@ -95,9 +105,10 @@ export default function StudentDashboard() {
     ? Math.round((completedEvaluations.length / totalEvaluations) * 100) 
     : 0;
 
-  // Generate skills improvement data
-  const skillsData = generateSkillsData(completedEvaluations);
-  
+  // Generate skills improvement data - pass completedEvaluations
+  // Note: generateSkillsData now handles the undefined case during loading
+  const skillsData = useMemo(() => generateSkillsData(evaluations), [evaluations]);
+
   // Generate progress over time data
   const progressData = generateProgressData(completedEvaluations);
   
@@ -107,7 +118,11 @@ export default function StudentDashboard() {
     { name: 'Pending', value: pendingEvaluations.length || 0 },
   ];
 
-  if (loading || !mounted) {
+  // Combine loading states
+  const isLoading = authLoading || !mounted || evaluationsLoading;
+
+  if (isLoading) {
+    // Keep showing skeleton while loading
     return (
       <DashboardLayout>
         <div className="space-y-4">
@@ -119,6 +134,27 @@ export default function StudentDashboard() {
             <Skeleton className="h-[120px]" />
           </div>
           <Skeleton className="h-[300px] mt-6" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Skills Chart Skeleton */}
+            <Card className="md:col-span-1 lg:col-span-2 border-indigo-100 overflow-hidden">
+              <CardHeader className="pb-2">
+                 {/* ... CardHeader Skeleton ... */}
+              </CardHeader>
+              <CardContent>
+                 <Skeleton className="h-[300px] w-full" />
+              </CardContent>
+            </Card>
+             {/* Progress Distribution Skeleton */}
+             <Card className="border-indigo-100 h-auto md:col-span-1">
+               <CardHeader className="pb-2">
+                 {/* ... CardHeader Skeleton ... */}
+               </CardHeader>
+               <CardContent>
+                 <Skeleton className="h-[300px] w-full" />
+               </CardContent>
+             </Card>
+         </div>
+         {/* ... More Skeletons ... */}
         </div>
       </DashboardLayout>
     );
@@ -131,13 +167,20 @@ export default function StudentDashboard() {
     return null;
   }
 
+  // Check if there are no evaluations at all after loading
+  const noEvaluationsExist = !evaluations || evaluations.length === 0;
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold mb-1">Your Speaking Dashboard</h1>
+          <h1 className="text-3xl font-bold mb-1">Student Dashboard</h1>
           <p className="text-gray-600">
-            Welcome, <span className="font-medium">{user.name || user.email}</span>. Track your speaking progress and submit new videos for evaluation.
+            Welcome, <span className="font-medium">
+              {(user as ExtendedUser | null)?.name || 
+               (user as ExtendedUser | null)?.email || 
+               'Student'}
+            </span>. Track your speaking progress and submit new videos for evaluation.
           </p>
         </div>
 
@@ -222,82 +265,87 @@ export default function StudentDashboard() {
                         <BarChart className="h-5 w-5 text-indigo-500 mr-2" />
                         Speaking Skills Progress
                       </CardTitle>
-                      <CardDescription>Your performance across key speaking skills</CardDescription>
+                      <CardDescription>Your performance across key speaking skills from the latest AI analysis</CardDescription>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {skillsData.length > 0 ? (
+                  {/* Explicitly handle loading state first */}
+                  {isLoading ? (
+                     <Skeleton className="h-[300px] w-full" />
+                  ) : skillsData.length > 0 ? (
+                    // Render chart only if we have actual data (not sample data if real evals exist but lack analysis)
                     <div className="h-[300px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <RechartsBarChart
-                          data={skillsData.slice(0, 10)}
+                          data={skillsData.slice(0, 10)} // Use the generated skillsData
                           layout="vertical"
-                          margin={{ top: 5, right: 30, left: 60, bottom: 5 }}
-                          barGap={2}
-                          barSize={18}
+                          margin={{ top: 5, right: 30, left: 80, bottom: 5 }} // Adjusted left margin for labels
                         >
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                          <XAxis 
-                            type="number" 
-                            domain={[-10, 10]} 
-                            tickCount={11}
-                            axisLine={false} 
-                            tickLine={false}
-                            tick={{ fontSize: 12 }}
-                          />
+                          <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                          <XAxis type="number" domain={[-10, 10]} tickCount={11} />
                           <YAxis 
-                            type="category" 
                             dataKey="formattedName" 
-                            width={130}
-                            axisLine={false} 
+                            type="category" 
+                            width={80} // Ensure enough width for labels
                             tickLine={false}
-                            tick={{ fontSize: 12 }}
+                            axisLine={false}
                           />
                           <Tooltip 
-                            cursor={{ fill: 'rgba(240, 240, 240, 0.3)' }}
-                            formatter={(value: number) => [`${value > 0 ? '+' : ''}${value}`, 'Score']}
+                            formatter={(value: number, name: string, props: any) => {
+                              // Find original data point to get category if needed
+                              const category = props.payload.category || 'Unknown';
+                              return [`${value.toFixed(1)}`, `${props.payload.formattedName}`];
+                            }}
                             contentStyle={{ 
                               backgroundColor: 'white', 
                               borderRadius: '8px',
                               border: '1px solid #e2e8f0',
                               boxShadow: '0 4px 6px rgba(0,0,0,0.05)'
                             }}
+                            cursor={{ fill: 'rgba(230, 230, 230, 0.3)' }}
                           />
                           <Bar 
                             dataKey="score" 
-                            fill="#10b981"
+                            // fill="#10b981" // Use dynamic fill instead
                             radius={[0, 4, 4, 0]}
                           >
                             {skillsData.map((entry, index) => (
                               <Cell 
                                 key={`cell-${index}`} 
+                                // Color based on score and whether it's good/bad implicitly by score range
                                 fill={entry.score > 0 
-                                  ? entry.score > 7 ? '#059669' : '#10b981'
-                                  : entry.score < -5 ? '#dc2626' : '#ef4444'} 
+                                  ? entry.score > 7 ? '#059669' : '#10b981' // Shades of green for positive
+                                  : entry.score < -5 ? '#dc2626' : '#ef4444'} // Shades of red for negative
                               />
                             ))}
                           </Bar>
                         </RechartsBarChart>
                       </ResponsiveContainer>
-                      {/* Note when showing sample data */}
-                      {(!evaluations || evaluations.length === 0 || !evaluations.some(e => e.results?.analysis)) && (
+                      {/* Note when showing sample data (only if no evaluations exist at all) */}
+                      {noEvaluationsExist && (
                         <div className="text-center mt-2">
                           <p className="text-xs text-gray-500 italic">Sample data shown. Submit a video for personalized analysis.</p>
                         </div>
                       )}
                     </div>
                   ) : (
+                    // Placeholder when loading is done but no analysis data is available in the latest evaluation
                     <div className="h-[300px] flex items-center justify-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
                       <div className="text-center p-6">
                         <BarChart className="mx-auto h-10 w-10 text-gray-400 mb-3" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-1">No skills data yet</h3>
+                        <h3 className="text-lg font-medium text-gray-900 mb-1">No AI skills data yet</h3>
                         <p className="text-sm text-gray-600 max-w-sm mx-auto mb-4">
-                          Submit your first speech video for evaluation to see your skills analysis.
+                          {completedEvaluations.length > 0 
+                            ? "Your latest completed evaluation doesn't have AI analysis results available."
+                            : "Submit your first speech video for evaluation to see your skills analysis."
+                          }
                         </p>
-                        <Button onClick={() => (document.querySelector('[data-value="submit"]') as HTMLElement)?.click()}>
-                          Submit a Video
-                        </Button>
+                        {completedEvaluations.length === 0 && (
+                           <Button onClick={() => (document.querySelector('[data-value="submit"]') as HTMLElement)?.click()}>
+                             Submit a Video
+                           </Button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -318,7 +366,7 @@ export default function StudentDashboard() {
                     <div className="h-[300px] flex flex-col justify-center">
                       <div className="h-[200px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
+                          <PieChart margin={{ top: 5, right: 5, bottom: 5, left: 5 }}> {/* Add margin */}
                             <Pie
                               data={distributionData}
                               cx="50%"
@@ -565,9 +613,15 @@ export default function StudentDashboard() {
 }
 
 // Helper functions
-function generateSkillsData(evaluations: any[]) {
-  if (!evaluations || evaluations.length === 0) {
-    // Return sample data if no evaluations are available
+function generateSkillsData(evaluations: any[] | undefined): any[] { // Accept undefined
+  // If evaluations haven't loaded yet, return empty array
+  if (evaluations === undefined) {
+    return []; 
+  }
+
+  // If there are absolutely no evaluations, return sample data for placeholder
+  if (evaluations.length === 0) {
+    console.log("generateSkillsData: No evaluations found, returning sample data.");
     return [
       { name: "strong_rhetoric", formattedName: "Strong Rhetoric", score: 8.5, category: "structural" },
       { name: "adapted_language", formattedName: "Adapted Language", score: 7.2, category: "structural" },
@@ -578,62 +632,55 @@ function generateSkillsData(evaluations: any[]) {
       { name: "repetitive_words", formattedName: "Repetitive Words", score: -3.1, category: "filler" }
     ];
   }
-  
+
   // Get the most recent evaluation with analysis data
   const evaluationsWithAnalysis = evaluations
-    .filter((e: any) => e.results?.analysis)
+    .filter((e: any) => e.results?.analysis && ['completed', 'reviewed', 'published'].includes(e.status)) // Ensure it's completed/reviewed
     .sort((a, b) => new Date(b.completed_at || b.created_at).getTime() - 
                   new Date(a.completed_at || a.created_at).getTime());
-  
+
+  // If real evaluations exist, but none have analysis, return empty array
   if (evaluationsWithAnalysis.length === 0) {
-    // Return sample data if no evaluations with analysis
-    return [
-      { name: "strong_rhetoric", formattedName: "Strong Rhetoric", score: 8.5, category: "structural" },
-      { name: "adapted_language", formattedName: "Adapted Language", score: 7.2, category: "structural" },
-      { name: "flow", formattedName: "Speech Flow", score: 6.8, category: "structural" },
-      { name: "tricolon", formattedName: "Tricolon", score: 5.9, category: "rhetorical" },
-      { name: "repetition", formattedName: "Repetition", score: 4.7, category: "rhetorical" },
-      { name: "filler_language", formattedName: "Filler Language", score: -2.3, category: "filler" },
-      { name: "repetitive_words", formattedName: "Repetitive Words", score: -3.1, category: "filler" }
-    ];
+    console.log("generateSkillsData: Evaluations exist, but none have analysis data. Returning empty array.");
+    return []; 
   }
-  
+
+  console.log("generateSkillsData: Found evaluation with analysis data. Processing:", evaluationsWithAnalysis[0].id);
   const latestAnalysis = evaluationsWithAnalysis[0].results.analysis;
-  
+
   // Transform to chart data
-  return Object.entries(latestAnalysis)
-    .map(([name, data]: [string, any]) => ({
-      name,
-      formattedName: formatSkillName(name),
-      score: data.score,
-      category: getSkillCategory(name)
-    }))
-    .sort((a, b) => b.score - a.score);
+  try {
+    const chartData = Object.entries(latestAnalysis)
+      .map(([name, data]: [string, any]) => {
+        // Basic validation
+        if (typeof data !== 'object' || data === null || typeof data.score !== 'number') {
+          console.warn(`generateSkillsData: Invalid data format for skill '${name}'`, data);
+          return null; // Skip invalid entries
+        }
+        return {
+          name,
+          formattedName: formatSkillName(name), // Assuming formatSkillName exists
+          score: data.score,
+          category: getSkillCategory(name) // Assuming getSkillCategory exists
+        };
+      })
+      .filter(item => item !== null); // Remove any null entries from invalid data
+
+    console.log("generateSkillsData: Generated chart data:", chartData);
+    return chartData;
+
+  } catch (error) {
+    console.error("generateSkillsData: Error processing analysis data:", error, latestAnalysis);
+    return []; // Return empty on error
+  }
 }
 
-function getSkillCategory(skill: string): string {
-  const categories: {[key: string]: string} = {
-    adapted_language: 'structural',
-    flow: 'structural',
-    strong_rhetoric: 'structural',
-    strategic_language: 'structural',
-    valued_language: 'structural',
-    filler_language: 'filler',
-    negations: 'filler',
-    repetitive_words: 'filler',
-    absolute_words: 'filler',
-    hexacolon: 'rhetorical',
-    tricolon: 'rhetorical',
-    repetition: 'rhetorical',
-    anaphora: 'rhetorical',
-    epiphora: 'rhetorical',
-    alliteration: 'rhetorical',
-    correctio: 'rhetorical',
-    climax: 'rhetorical',
-    anadiplosis: 'rhetorical'
-  };
-  
-  return categories[skill] || 'other';
+// Helper function to get skill category (Example - adjust as needed)
+function getSkillCategory(name: string): string {
+  // Add logic based on your skill naming or IDs
+  if (name.includes('filler') || name.includes('repetitive')) return 'filler';
+  if (['tricolon', 'repetition', 'anaphora', 'epiphora', 'alliteration', 'correctio', 'climax', 'anadiplosis'].includes(name)) return 'rhetorical';
+  return 'structural';
 }
 
 function generateProgressData(evaluations: any[]) {
@@ -681,4 +728,10 @@ function generateProgressData(evaluations: any[]) {
       rhetorical: parseFloat(rhetorical.toFixed(1)),
     };
   });
+}
+
+export async function getServerSideProps() {
+  return {
+    props: {}, // will be passed to the page component as props
+  }
 }

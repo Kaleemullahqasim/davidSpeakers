@@ -1,14 +1,24 @@
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import LandingPage from '@/components/landing/LandingPage';
 
 export default function Home() {
-  const { user, loading } = useAuth();
   const router = useRouter();
-
+  const [isMounted, setIsMounted] = useState(false);
+  
+  // Only access auth after mounting to prevent SSR issues
   useEffect(() => {
+    setIsMounted(true);
+  }, []);
+  
+  // Only access auth on the client side
+  useEffect(() => {
+    if (isMounted) {
+      // Safe to use auth context now
+      const { user, loading } = useAuth();
+      
     if (!loading && user) {
       if (user.role === 'student') {
         router.push('/dashboard/student');
@@ -18,8 +28,10 @@ export default function Home() {
         router.push('/dashboard/admin');
       }
     }
-  }, [user, loading, router]);
+    }
+  }, [isMounted, router]);
 
+  // Simple render that doesn't depend on auth context
   return (
     <>
       <Head>
@@ -33,4 +45,11 @@ export default function Home() {
       </main>
     </>
   );
+}
+
+// Add getServerSideProps to avoid static generation
+export async function getServerSideProps() {
+  return {
+    props: {}, // will be passed to the page component as props
+  }
 }

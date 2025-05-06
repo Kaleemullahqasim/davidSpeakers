@@ -1,11 +1,12 @@
-import { createClient } from '@supabase/supabase-js';
+/**
+ * @deprecated Use the new client utilities in utils/supabase/* instead
+ * This file is kept for backwards compatibility with existing code
+ */
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+import { createClient as createBrowserClient } from '@/utils/supabase/client'
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase URL or Anonymous Key in environment variables.');
-}
+// Create a singleton instance for compatibility with old code
+export const supabase = createBrowserClient()
 
-// Create a single instance of the Supabase client
-export const supabase = createClient(supabaseUrl, supabaseKey); 
+// Export the function as well for components that need to create their own client
+export const createClient = createBrowserClient 

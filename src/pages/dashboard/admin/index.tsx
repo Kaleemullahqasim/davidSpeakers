@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 import { useQuery } from '@tanstack/react-query';
 import { fetchCoachUsers, fetchStudentUsers, fetchAllEvaluations } from '@/lib/api';
@@ -10,6 +10,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { useState, useEffect } from 'react';
 import { getAuthToken } from '@/lib/auth-helpers';
+
+// Add a type assertion to fix property access
+type ExtendedUser = {
+  id: string;
+  email?: string;
+  name?: string;
+  role?: string;
+};
 
 export default function AdminDashboard() {
   const { user, loading } = useAuth();
@@ -138,6 +146,12 @@ export default function AdminDashboard() {
     }
   ];
 
+  // Add null checks for user with type assertion
+  const displayName = (user as ExtendedUser | null)?.name || 
+                     (user as ExtendedUser | null)?.email || 
+                     (user as ExtendedUser | null)?.id?.substring(0, 8) || 
+                     'Admin';
+
   if (loading) {
     return <p>Loading...</p>;
   }
@@ -153,7 +167,7 @@ export default function AdminDashboard() {
         <div>
           <h1 className="text-3xl font-bold">Admin Dashboard</h1>
           <p className="text-gray-600">
-            Welcome, {user.name}! Manage users and configure system settings.
+            Welcome, {displayName}! Manage users and configure system settings.
           </p>
         </div>
 
@@ -315,4 +329,10 @@ export default function AdminDashboard() {
       </div>
     </DashboardLayout>
   );
+}
+
+export async function getServerSideProps() {
+  return {
+    props: {}, // will be passed to the page component as props
+  }
 }

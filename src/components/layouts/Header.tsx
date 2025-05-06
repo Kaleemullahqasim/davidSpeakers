@@ -10,15 +10,15 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/router';
 
 interface HeaderProps {
   user: {
     id: string;
-    email: string;
-    name: string;
-    role: string;
+    email?: string;
+    name?: string;
+    role?: string;
   };
 }
 
@@ -26,6 +26,9 @@ export default function Header({ user }: HeaderProps) {
   const { logout } = useAuth();
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  
+  // Get user's display name, fallback to email or ID
+  const displayName = user.name || user.email || user.id.substring(0, 8);
   
   const handleLogout = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -67,8 +70,8 @@ export default function Header({ user }: HeaderProps) {
   // Update the Avatar component logic to use a data URL instead of a file path
   const getDefaultAvatarDataUrl = () => {
     // Return a simple SVG data URL with the user's initials
-    const initials = getInitials(user.name);
-    const bgColor = stringToColor(user.name);
+    const initials = getInitials(displayName);
+    const bgColor = stringToColor(displayName);
     
     // Create a simple SVG with the initials
     const svg = `
@@ -102,7 +105,7 @@ export default function Header({ user }: HeaderProps) {
     'student': 'Student'
   };
   
-  const roleName = roleMap[user.role as keyof typeof roleMap] || user.role;
+  const roleName = user.role ? (roleMap[user.role as keyof typeof roleMap] || user.role) : 'User';
 
   return (
     <header className="bg-white border-b border-gray-200 py-3 px-6 flex items-center justify-between">
@@ -162,30 +165,30 @@ export default function Header({ user }: HeaderProps) {
             <Button variant="ghost" className="relative h-8 rounded-full flex items-center gap-2">
               <Avatar className="h-8 w-8">
                 {/* Use data URL for avatar instead of file path */}
-                <AvatarImage src={getDefaultAvatarDataUrl()} alt={user.name} />
-                <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+                <AvatarImage src={getDefaultAvatarDataUrl()} alt={displayName} />
+                <AvatarFallback>{getInitials(displayName)}</AvatarFallback>
               </Avatar>
               <span className="hidden md:inline-block text-sm font-medium truncate max-w-[100px]">
-                {user.name}
+                {displayName}
               </span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>
               <div>
-                <p>{user.name}</p>
+                <p>{displayName}</p>
                 <p className="text-xs text-gray-500">{roleName}</p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => router.push(`/dashboard/${user.role}/profile`)}
+              onClick={() => router.push(`/dashboard/${user.role || 'student'}/profile`)}
             >
               <User className="mr-2 h-4 w-4" />
               <span>Profile</span>
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={() => router.push(`/dashboard/${user.role}/settings`)}
+              onClick={() => router.push(`/dashboard/${user.role || 'student'}/settings`)}
             >
               <Settings className="mr-2 h-4 w-4" />
               <span>Settings</span>

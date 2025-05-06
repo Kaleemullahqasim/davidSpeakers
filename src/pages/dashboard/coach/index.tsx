@@ -1,15 +1,16 @@
-import { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import Link from 'next/link';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
-import { fetchCoachEvaluations } from '@/lib/api';
-import DashboardLayout from '@/components/layouts/DashboardLayout';
+import { fetchCoachEvaluations } from '@/lib/api'; // Assuming API function exists
+import DashboardLayout from '@/components/layouts/DashboardLayout'; // Corrected import path (plural 'layouts')
+// import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+
 import { 
   BarChart, 
   CheckCircle, 

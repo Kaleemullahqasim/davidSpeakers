@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { fetchWithAuth } from '@/lib/auth-helpers';
+import { fetchWithAuth, syncAuthToken } from '@/lib/auth-helpers';
 import { Info, HelpCircle } from 'lucide-react'; // Fixed import: InfoCircle -> Info
 
 export function VideoUploadForm() {
@@ -70,6 +70,14 @@ export function VideoUploadForm() {
       console.log('Submitting video with ID:', videoId);
       console.log('Audience information:', audience);
       
+      // Try to resync auth token before submission
+      try {
+        await syncAuthToken();
+      } catch (syncError) {
+        console.warn('Failed to sync token before submission:', syncError);
+        // Continue anyway, fetchWithAuth will handle token issues
+      }
+      
       // Call API to start evaluation with auth
       const response = await fetchWithAuth('/api/evaluations/create', {
         method: 'POST',
@@ -80,7 +88,20 @@ export function VideoUploadForm() {
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ message: `Server error: ${response.status}` }));
+        
+        // Handle specific error cases
+        if (response.status === 401 || response.status === 403) {
+          // Auth issue - redirect to login
+          toast({
+            title: 'Authentication error',
+            description: 'Please log in again to continue',
+            variant: 'destructive',
+          });
+          router.push('/login?expired=true');
+          return;
+        }
+        
         throw new Error(errorData.message || 'Failed to submit video');
       }
       
@@ -93,18 +114,29 @@ export function VideoUploadForm() {
       });
       
       // First navigate to the dashboard, then to the specific evaluation if available
-      // This prevents issues with trying to access an evaluation that might not be immediately available
       router.push('/dashboard/student');
-      
-      // Optional: If we have an evaluationId and want to redirect to it after a delay
-      // if (data.evaluationId) {
-      //   setTimeout(() => {
-      //     router.push(`/dashboard/student/evaluations/${data.evaluationId}`);
-      //   }, 2000);
-      // }
       
     } catch (error) {
       console.error('Submission error:', error);
+      
+      // Check if it's an auth error
+      if (error instanceof Error && 
+          (error.message.includes('token') || 
+           error.message.includes('auth') || 
+           error.message.includes('login') ||
+           error.message.includes('session'))) {
+        
+        toast({
+          title: 'Session expired',
+          description: 'Your session has expired. Please log in again.',
+          variant: 'destructive',
+        });
+        
+        // Redirect to login
+        router.push('/login?expired=true');
+        return;
+      }
+      
       setError(error instanceof Error ? error.message : 'Failed to submit video');
       
       toast({

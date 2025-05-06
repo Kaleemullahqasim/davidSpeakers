@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchEvaluation, fetchCoachUsers, updateEvaluation } from '@/lib/api';
 import { getAuthToken, fetchWithAuth } from '@/lib/auth-helpers';

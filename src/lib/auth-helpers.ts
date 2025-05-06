@@ -4,7 +4,54 @@ import { supabase } from './supabaseClient'; // Import the singleton instance
 const isBrowser = typeof window !== 'undefined';
 
 // Constants
-const AUTH_OPERATION_TIMEOUT = 10000; // 10 seconds
+const AUTH_OPERATION_TIMEOUT = 15000; // 10 seconds
+
+/**
+ * Synchronizes the token from Supabase to localStorage and sessionStorage
+ * This should be called when setting up auth initially
+ */
+export async function syncAuthToken(): Promise<string | null> {
+  try {
+    if (!supabase || !isBrowser) {
+      console.log('Not in browser or Supabase client not available');
+      return null;
+    }
+    
+    console.log('Syncing auth token...');
+    
+    // Get the current session from Supabase
+    const sessionPromise = supabase.auth.getSession();
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Get session timed out')), AUTH_OPERATION_TIMEOUT);
+    });
+    
+    // Race the promises
+    const { data, error } = await Promise.race([
+      sessionPromise,
+      timeoutPromise.then(() => ({ data: null, error: new Error('Get session timed out') }))
+    ]) as any;
+    
+    if (error) {
+      console.error('Error getting session in syncAuthToken:', error);
+      return null;
+    }
+    
+    if (!data?.session?.access_token) {
+      console.log('No active session found in syncAuthToken');
+      return null;
+    }
+    
+    // Store the token in localStorage and sessionStorage
+    localStorage.setItem('token', data.session.access_token);
+    sessionStorage.setItem('token', data.session.access_token);
+    
+    console.log('Auth token synced successfully');
+    return data.session.access_token;
+  } catch (error) {
+    console.error('Error in syncAuthToken:', error);
+    return null;
+  }
+}
 
 export async function getAuthToken(): Promise<string | null> {
   try {

@@ -1,6 +1,6 @@
 import { ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import Sidebar from '@/components/layouts/Sidebar';
 import Header from '@/components/layouts/Header';
 import { Loader2 } from 'lucide-react';
@@ -57,7 +57,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="flex">
-        <Sidebar userRole={user.role} />
+        <Sidebar userRole={user.role || 'student'} />
         <div className="flex-1">
           <Header user={user} />
           <main className="p-6 max-w-7xl mx-auto">{children}</main>

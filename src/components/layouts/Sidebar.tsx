@@ -15,11 +15,11 @@ import {
   Award,
   Headphones
 } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
 interface SidebarProps {
-  userRole: 'admin' | 'coach' | 'student';
+  userRole: 'admin' | 'coach' | 'student' | string;
 }
 
 export default function Sidebar({ userRole }: SidebarProps) {
@@ -44,7 +44,10 @@ export default function Sidebar({ userRole }: SidebarProps) {
 
   // Define navigation items based on user role
   const getNavItems = () => {
-    switch (userRole) {
+    // Normalize role to handle any case variations
+    const normalizedRole = typeof userRole === 'string' ? userRole.toLowerCase() : '';
+    
+    switch (normalizedRole) {
       case 'admin':
         return [
           { href: '/dashboard/admin', label: 'Dashboard', icon: <Home className="h-5 w-5" /> },
@@ -60,13 +63,13 @@ export default function Sidebar({ userRole }: SidebarProps) {
           { href: '/dashboard/coach/resources', label: 'Resources', icon: <Book className="h-5 w-5" /> },
         ];
       case 'student':
+      default:
+        // Default to student navigation if role is not recognized
         return [
           { href: '/dashboard/student', label: 'Dashboard', icon: <Home className="h-5 w-5" /> },
           { href: '/dashboard/student/evaluations', label: 'My Evaluations', icon: <VideoIcon className="h-5 w-5" /> },
           { href: '/dashboard/student/resources', label: 'Learning Resources', icon: <Book className="h-5 w-5" /> },
         ];
-      default:
-        return [];
     }
   };
 
