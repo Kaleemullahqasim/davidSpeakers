@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { formatSkillName } from '@/lib/speechUtils';
 import { useToast } from '@/components/ui/use-toast';
+
 import { 
   BarChart,
   TrendingUp,
@@ -647,6 +648,34 @@ function generateSkillsData(evaluations: any[] | undefined): any[] { // Accept u
 
   console.log("generateSkillsData: Found evaluation with analysis data. Processing:", evaluationsWithAnalysis[0].id);
   const latestAnalysis = evaluationsWithAnalysis[0].results.analysis;
+
+  // Add this block to handle nested language analysis
+  if (latestAnalysis.language && typeof latestAnalysis.language === 'object') {
+    console.log("generateSkillsData: Found nested language analysis structure");
+    
+    // Process skills from nested language structure
+    const chartData = Object.entries(latestAnalysis.language)
+      .map(([skillId, data]: [string, any]) => {
+        if (typeof data !== 'object' || data === null || typeof data.score !== 'number') {
+          console.warn(`Invalid language skill data for ID '${skillId}'`, data);
+          return null;
+        }
+        
+        return {
+          name: data.name || `skill_${skillId}`,
+          formattedName: data.name || `Skill ${skillId}`,
+          score: data.score,
+          category: 'language' // All these are language skills
+        };
+      })
+      .filter((item): item is {name: string, formattedName: string, score: number, category: string} => 
+        item !== null
+      ) // Type-safe filtering
+      .sort((a, b) => Math.abs(b.score) - Math.abs(a.score)); // Now TypeScript knows these can't be null
+    
+    console.log(`generateSkillsData: Generated ${chartData.length} data points from language analysis`);
+    return chartData;
+  }
 
   // Transform to chart data
   try {
