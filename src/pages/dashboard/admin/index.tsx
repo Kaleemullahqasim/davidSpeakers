@@ -172,40 +172,41 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-2xl">
-                {studentsLoading || fetchingDirectly ? '...' : effectiveStudents.length || 0}
-              </CardTitle>
-              <CardDescription>Total Students</CardDescription>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-2xl">
-                {coachesLoading ? '...' : coaches?.length || 0}
-              </CardTitle>
-              <CardDescription>Total Coaches</CardDescription>
-            </CardHeader>
-          </Card>
-          <Card className={pendingCoachApprovals > 0 ? "border-orange-300 bg-orange-50" : ""}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-2xl">
-                {coachesLoading ? '...' : pendingCoachApprovals}
-              </CardTitle>
-              <CardDescription>Pending Coach Approvals</CardDescription>
-            </CardHeader>
-            {pendingCoachApprovals > 0 && (
-              <CardContent>
-                <Button
-                  size="sm"
-                  onClick={() => router.push('/dashboard/admin/users')}
-                >
-                  Review Requests
-                </Button>
-              </CardContent>
-            )}
-          </Card>
+        <Card className="bg-indigo-50 border border-indigo-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-2xl">
+              {studentsLoading || fetchingDirectly ? '...' : effectiveStudents.length || 0}
+            </CardTitle>
+            <CardDescription>Total Students</CardDescription>
+          </CardHeader>
+        </Card>
+
+        <Card className="bg-emerald-50 border border-emerald-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-2xl">
+              {coachesLoading ? '...' : coaches?.length || 0}
+            </CardTitle>
+            <CardDescription>Total Coaches</CardDescription>
+          </CardHeader>
+        </Card>
+        <Card className={pendingCoachApprovals > 0 ? "bg-orange-50 border border-orange-200" : ""}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-2xl">
+              {coachesLoading ? '...' : pendingCoachApprovals}
+            </CardTitle>
+            <CardDescription>Pending Coach Approvals</CardDescription>
+          </CardHeader>
+          {pendingCoachApprovals > 0 && (
+            <CardContent>
+              <Button size="sm" onClick={() => router.push('/dashboard/admin/users')}>
+                Review Requests
+              </Button>
+            </CardContent>
+          )}
+        </Card>
+
+       
+
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
