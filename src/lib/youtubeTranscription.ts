@@ -1,5 +1,96 @@
 import { YoutubeTranscript } from 'youtube-transcript';
-import { decode } from 'html-entities'; // Add this package via npm install html-entities
+import { decode } from 'html-entities';
+import axios from 'axios';
+
+// Add interfaces for Supadata API responses
+interface SupadataTranscriptSegment {
+  lang: string;
+  text: string;
+  offset: number;
+  duration: number;
+}
+
+interface SupadataTranscriptResponse {
+  lang: string;
+  availableLangs: string[];
+  content: SupadataTranscriptSegment[];
+}
+
+/**
+ * Gets a transcript from YouTube using the Supadata API
+ * @param videoId The YouTube video ID
+ * @returns A promise that resolves to the transcript text
+ */
+export async function getSupadataTranscript(videoId: string): Promise<string> {
+  try {
+    console.log(`[Supadata] Starting transcription for video ID: ${videoId}`);
+    
+    // Make request to Supadata API
+    const response = await axios.get<SupadataTranscriptResponse>(
+      `https://api.supadata.ai/v1/youtube/transcript`,
+      {
+        params: { videoId },
+        headers: { 'x-api-key': process.env.SUPADATA_API_KEY },
+        timeout: 8000 // Stay under Vercel's limit
+      }
+    );
+    
+    // Check if we got a valid response
+    if (!response.data || !response.data.content || response.data.content.length === 0) {
+      throw new Error('No transcript content returned from Supadata API');
+    }
+    
+    console.log(`[Supadata] Received transcript with ${response.data.content.length} segments`);
+    console.log(`[Supadata] Available languages: ${response.data.availableLangs.join(', ')}`);
+    
+    // Prefer English transcript if available, otherwise use whatever language is returned
+    const preferredLang = response.data.availableLangs.includes('en') ? 'en' : response.data.lang;
+    console.log(`[Supadata] Using language: ${preferredLang}`);
+    
+    // Extract and combine text from all segments
+    let fullTranscript = '';
+    
+    // If we need to switch to English (or another language), make another request
+    if (preferredLang !== response.data.lang) {
+      console.log(`[Supadata] Fetching transcript in ${preferredLang} language`);
+      const langResponse = await axios.get<SupadataTranscriptResponse>(
+        `https://api.supadata.ai/v1/youtube/transcript`,
+        {
+          params: { 
+            videoId,
+            lang: preferredLang
+          },
+          headers: { 'x-api-key': process.env.SUPADATA_API_KEY },
+          timeout: 8000
+        }
+      );
+      
+      if (!langResponse.data || !langResponse.data.content) {
+        throw new Error(`Failed to get transcript in ${preferredLang}`);
+      }
+      
+      // Join all text segments
+      fullTranscript = langResponse.data.content
+        .map(segment => segment.text.trim())
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    } else {
+      // Use original response
+      fullTranscript = response.data.content
+        .map(segment => segment.text.trim())
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+    
+    console.log(`[Supadata] Successfully transcribed video, length: ${fullTranscript.length} chars`);
+    return fullTranscript;
+  } catch (error) {
+    console.error('[Supadata] Error getting transcript:', error);
+    throw new Error(`Supadata API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
 
 /**
  * Decodes HTML entities in a string (Node.js compatible)
@@ -7,7 +98,6 @@ import { decode } from 'html-entities'; // Add this package via npm install html
  * @returns The decoded text
  */
 function decodeHtmlEntities(text: string): string {
-  // Use html-entities package which works in both browser and Node.js
   return decode(text);
 }
 
@@ -65,45 +155,44 @@ export async function getYouTubeVideoDetails(videoId: string) {
  */
 export async function transcribeYouTubeVideo(videoId: string): Promise<string> {
   try {
-    console.log(`Starting transcription for video ID: ${videoId}`);
+    console.log(`Starting transcription for video ID: ${videoId} using Supadata API`);
     
-    // Fetch transcript using the correct method according to documentation
-    const transcriptResponse = await YoutubeTranscript.fetchTranscript(videoId);
+    // Use our new Supadata method instead of the previous implementation
+    const transcript = await getSupadataTranscript(videoId);
     
-    if (!transcriptResponse || transcriptResponse.length === 0) {
-      throw new Error('No transcript found for this video');
+    if (!transcript || transcript.length === 0) {
+      throw new Error('Empty transcript returned');
     }
     
-    console.log(`Received transcript with ${transcriptResponse.length} segments`);
+    // Clean up any remaining HTML entities
+    const cleanedTranscript = decodeHtmlEntities(transcript);
     
-    // Combine all transcript segments into a single string
-    let fullTranscript = transcriptResponse
-      .map((segment: any) => segment.text)
-      .join(' ')
-      .replace(/\s+/g, ' ') // Replace multiple spaces with a single space
-      .trim();
-    
-    // Clean up HTML entities like &amp;#39; (which should be apostrophes)
-    // First, replace known patterns
-    fullTranscript = fullTranscript
-      .replace(/&amp;#39;/g, "'")       // Replace &amp;#39; with apostrophe
-      .replace(/&#39;/g, "'")           // Replace &#39; with apostrophe
-      .replace(/&quot;/g, '"')          // Replace &quot; with double quote
-      .replace(/&amp;/g, '&')           // Replace &amp; with &
-      .replace(/&lt;/g, '<')            // Replace &lt; with <
-      .replace(/&gt;/g, '>')            // Replace &gt; with >
-      .replace(/\s+/g, ' ')             // Clean up any extra spaces created in replacements
-      .trim();
-    
-    // If we're in a browser environment, use the DOM to decode any remaining entities
-    if (typeof window !== 'undefined') {
-      fullTranscript = decodeHtmlEntities(fullTranscript);
-    }
-    
-    return fullTranscript;
+    console.log(`Successfully transcribed video: ${cleanedTranscript.substring(0, 50)}...`);
+    return cleanedTranscript;
   } catch (error) {
-    console.error('Error getting YouTube transcript:', error);
-    throw new Error(`Failed to get transcript: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error('Error transcribing video:', error);
+    
+    // Try the original method as fallback (optional)
+    // If you want to remove the fallback, just throw the error here
+    try {
+      console.log('Attempting fallback transcription method...');
+      const transcriptSegments = await YoutubeTranscript.fetchTranscript(videoId);
+      
+      if (!transcriptSegments || transcriptSegments.length === 0) {
+        throw new Error('No transcript found for this video');
+      }
+      
+      const fallbackTranscript = transcriptSegments
+        .map((segment: any) => segment.text)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      return decodeHtmlEntities(fallbackTranscript);
+    } catch (fallbackError) {
+      console.error('Fallback transcription also failed:', fallbackError);
+      throw new Error(`Failed to get transcript: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 }
 
