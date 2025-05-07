@@ -1,14 +1,14 @@
 import { YoutubeTranscript } from 'youtube-transcript';
+import { decode } from 'html-entities'; // Add this package via npm install html-entities
 
 /**
- * Decodes HTML entities in a string
+ * Decodes HTML entities in a string (Node.js compatible)
  * @param text The text with HTML entities to decode
  * @returns The decoded text
  */
 function decodeHtmlEntities(text: string): string {
-  // Create a temporary element to use the browser's built-in HTML entity decoding
-  const doc = new DOMParser().parseFromString(text, 'text/html');
-  return doc.body.textContent || '';
+  // Use html-entities package which works in both browser and Node.js
+  return decode(text);
 }
 
 export async function getYouTubeTranscript(videoId: string): Promise<string | null> {
