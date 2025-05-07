@@ -377,7 +377,8 @@ export default function StudentDashboard() {
                               paddingAngle={5}
                               dataKey="value"
                               labelLine={false}
-                              label={({ name, percent }) => percent > 0 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''}
+                              // label={({ name, percent }) => percent > 0 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''}
+                              label={({ percent }) => percent > 0 ? `${(percent * 100).toFixed(0)}%` : ''}
                             >
                               {distributionData.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

@@ -290,8 +290,11 @@ export default function CoachDashboard() {
                       outerRadius={80}
                       paddingAngle={5}
                       dataKey="value"
-                      label={({name, value, percent}) => 
-                        value > 0 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''
+                      // label={({name, value, percent}) => 
+                      //   value > 0 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''
+                      // }
+                      label={({ percent }) => 
+                        percent > 0 ? `${(percent * 100).toFixed(0)}%` : ''
                       }
                       labelLine={false}
                     >
