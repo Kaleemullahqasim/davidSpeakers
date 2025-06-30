@@ -21,7 +21,7 @@ export function createAnalysisPrompt(transcript: string, audience?: string): str
     2. Flow – Ensuring smooth and logical speech progression with transition words.
     3. Strong Rhetoric – Using persuasive and impactful language.
     4. Strategic Language – Choosing words that align with the speech's goal.
-    5. Valued Language – Using words that evoke positive emotions or credibility.
+    5. Valued Language – Using words that evoke positive emotions or credibility for intended audience of mentioned above in audience field.
     
     Filler Elements (negative patterns):
     6. Filler Language – Using unnecessary words like "you know" and "like."
