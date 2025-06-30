@@ -146,19 +146,34 @@ export default async function handler(
         if (insertError) {
           console.error('Error inserting skill scores:', insertError);
           
-          // Check if it's a duplicate key error (which shouldn't happen since we deleted first)
+          // Check if it's a duplicate key error - this can happen with rapid saves
           if (insertError.code === '23505') {
-            return res.status(409).json({ 
-              message: 'Conflict with existing scores', 
-              details: insertError.message,
-              recommendation: 'Try refreshing the page and submitting again'
+            // Instead of returning an error, try to handle it gracefully by using upsert
+            console.log('Duplicate key detected, attempting upsert instead...');
+            
+            // Try using upsert to handle the conflict
+            const { error: upsertError } = await supabase
+              .from('skill_settings_and_scores')
+              .upsert(skillScores, { 
+                onConflict: 'evaluation_id,skill_id',
+                ignoreDuplicates: false 
+              });
+            
+            if (upsertError) {
+              console.error('Upsert also failed:', upsertError);
+              return res.status(500).json({ 
+                message: 'Failed to save skill scores after conflict resolution', 
+                details: upsertError.message 
+              });
+            }
+            
+            console.log('Successfully resolved conflict using upsert');
+          } else {
+            return res.status(500).json({ 
+              message: 'Failed to save skill scores', 
+              details: insertError.message 
             });
           }
-          
-          return res.status(500).json({ 
-            message: 'Failed to save skill scores', 
-            details: insertError.message 
-          });
         }
       }
       

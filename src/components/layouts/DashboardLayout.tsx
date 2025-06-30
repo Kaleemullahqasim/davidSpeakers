@@ -34,8 +34,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       }
       
       // If at root /dashboard, redirect to role-specific dashboard
+      // BUT exclude students - let the main dashboard handle student redirects to latest evaluation
       if (path === '/dashboard') {
-        router.push(`/dashboard/${user.role}`);
+        if (user.role === 'admin') {
+          router.push('/dashboard/admin');
+        } else if (user.role === 'coach') {
+          router.push('/dashboard/coach');
+        }
+        // For students, don't redirect here - let /dashboard/index.tsx handle the logic
+        // to redirect to their latest completed evaluation
       }
     }
   }, [user, loading, router]);

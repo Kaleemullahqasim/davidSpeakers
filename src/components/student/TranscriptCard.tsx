@@ -71,7 +71,7 @@ export function TranscriptCard({ transcript, audienceInfo, onToggleVideo }: Tran
       
       {audienceInfo && (
         <div className="px-6 pb-2">
-          <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-md border border-blue-200">
+          <div className="flex items-start gap-2 p-3 bg-white rounded-md border border-gray-200">
             <Users className="h-5 w-5 text-blue-600 mt-0.5" />
             <div>
               <p className="text-sm font-medium text-blue-800">Target Audience</p>

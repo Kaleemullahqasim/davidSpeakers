@@ -163,10 +163,14 @@ export function ManualScoringTable({
       // Mark that changes have been saved
       setHasUnsavedChanges(false);
       
-      toast({
-        title: "Scores saved",
-        description: `${getSkillsForType().name} skills have been scored successfully.`,
-      });
+      // Only show success toast for manual saves, not auto-saves
+      if (!autoSaveTimeoutId) {
+        toast({
+          title: "Scores saved",
+          description: `${getSkillsForType().name} skills have been scored successfully.`,
+          duration: 2000, // Shorter duration
+        });
+      }
 
       // Notify parent component if callback provided
       if (onScoresSaved) {
@@ -174,11 +178,16 @@ export function ManualScoringTable({
       }
     } catch (error) {
       console.error('Error saving scores:', error);
-      toast({
-        title: "Error saving scores",
-        description: error instanceof Error ? error.message : "An unknown error occurred",
-        variant: "destructive"
-      });
+      
+      // Only show error toast if it's not a conflict error (which we handle gracefully)
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+      if (!errorMessage.includes('Conflict') && !errorMessage.includes('duplicate key')) {
+        toast({
+          title: "Issue saving scores",
+          description: "Scores may have been saved. Please check the Summary tab to verify.",
+          duration: 3000, // Shorter duration
+        });
+      }
     } finally {
       setSaving(false);
     }

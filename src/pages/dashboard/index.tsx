@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Loader2, AlertTriangle, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { fetchLatestCompletedEvaluation } from '@/lib/api'
 
 export default function Dashboard() {
   const router = useRouter();
@@ -49,6 +50,34 @@ export default function Dashboard() {
       return;
     }
     
+    // Handle student redirect to latest completed evaluation
+    const handleStudentRedirect = async () => {
+      try {
+        console.log('🔄 Starting handleStudentRedirect function...');
+        console.log('📡 Calling fetchLatestCompletedEvaluation API...');
+        const { evaluation, hasCompletedEvaluations } = await fetchLatestCompletedEvaluation();
+        
+        console.log('📊 API Response:', { 
+          hasCompletedEvaluations, 
+          evaluationId: evaluation?.id,
+          evaluationStatus: evaluation?.status,
+          evaluationCompletedAt: evaluation?.completed_at
+        });
+        
+        if (hasCompletedEvaluations && evaluation) {
+          console.log(`✅ Found completed evaluation! Redirecting to: /dashboard/student/evaluations/${evaluation.id}`);
+          router.push(`/dashboard/student/evaluations/${evaluation.id}`);
+        } else {
+          console.log('❌ No completed evaluations found, redirecting to student dashboard');
+          router.push('/dashboard/student');
+        }
+      } catch (error) {
+        console.error('💥 Error in handleStudentRedirect:', error);
+        console.log('🔄 Falling back to student dashboard');
+        router.push('/dashboard/student');
+      }
+    };
+    
     // Redirect to role-specific dashboard once loaded
     if (!loading && user) {
       console.log('User authenticated with role:', user?.role);
@@ -60,8 +89,10 @@ export default function Dashboard() {
         console.log('Redirecting to coach dashboard');
         router.push('/dashboard/coach');
       } else if (user?.role === 'student') {
-        console.log('Redirecting to student dashboard');
-        router.push('/dashboard/student');
+        console.log('Student login detected - checking for latest completed evaluation');
+        
+        // For students, try to redirect to their latest completed evaluation
+        handleStudentRedirect();
       } else {
         // Default dashboard - generic view if role not recognized
         console.warn('User has unknown role:', user?.role);
@@ -120,7 +151,7 @@ export default function Dashboard() {
             <div className="flex flex-col gap-2">
               <Link href={`/dashboard/${user?.role}`}>
                 <Button variant="default" className="w-full">
-                  Go to {user?.role.charAt(0).toUpperCase() + user?.role.slice(1)} Dashboard
+                  Go to {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'User'} Dashboard
                 </Button>
               </Link>
             </div>

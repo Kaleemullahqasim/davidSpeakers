@@ -88,12 +88,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const supabaseAuthUser = supabaseSession.user;
       console.log(`Supabase session active, fetching app profile for ID: ${supabaseAuthUser.id}`);
 
-      supabase
+      // Store the access token in localStorage for API calls
+      if (supabaseSession.access_token) {
+        localStorage.setItem('token', supabaseSession.access_token);
+        console.log('Token stored in localStorage for API calls');
+      }
+
+      // Fetch user profile with async/await to avoid promise chain issues
+      (async () => {
+        try {
+          const { data: userData, error: userError } = await supabase
         .from('users')
         .select('id, email, name, role')
         .eq('id', supabaseAuthUser.id)
-        .single()
-        .then(({ data: userData, error: userError }) => {
+            .single();
+
           if (userError) {
             console.error('AuthContext: Error fetching user data from users table:', userError);
             setUser(null);
@@ -112,13 +121,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               role: userData.role,
             });
           }
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
+          setUser(null);
+        } finally {
           setLoading(false);
-        }).catch(error => {
-            console.error("Error fetching user profile:", error);
-            setUser(null);
-            setLoading(false);
-        });
+        }
+      })();
     } else if (supabaseSession === null) { // Explicitly no session
+      // Clear tokens when session is null
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
       setUser(null);
       setLoading(false);
     }
@@ -141,6 +154,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     // setLoading(true); // onAuthStateChange will set session to null, triggering profile state update
     try {
+      // Clear tokens immediately
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      
       await supabase.auth.signOut();
       // onAuthStateChange will set supabaseSession to null, which clears the user and sets loading.
     } catch (error) {

@@ -51,6 +51,7 @@ function CoachEvaluationDetail() {
   const [isStartingReview, setIsStartingReview] = useState(false);
   const [videoPlayerVisible, setVideoPlayerVisible] = useState(false);
   const [coachFeedback, setCoachFeedback] = useState('');
+  const [feedbackVideoUrl, setFeedbackVideoUrl] = useState('');
   const [adjustedScores, setAdjustedScores] = useState<{[key: string]: number}>({});
   const [audienceInfo, setAudienceInfo] = useState('');
   const [criticalSkills, setCriticalSkills] = useState<string[]>([]);
@@ -80,6 +81,9 @@ function CoachEvaluationDetail() {
       }
       if (evaluation.coach_feedback) {
         setCoachFeedback(evaluation.coach_feedback);
+      }
+      if (evaluation.feedback_video_url) {
+        setFeedbackVideoUrl(evaluation.feedback_video_url);
       }
       if (evaluation.results?.audience) {
         setAudienceInfo(evaluation.results.audience);
@@ -241,7 +245,7 @@ function CoachEvaluationDetail() {
       [skill]: score
     }));
     setHasUnsavedChanges(true);
-    notifyScoreUpdate();
+    notifyScoreUpdate(false); // Don't show toast for individual score changes
   };
 
   const handleSubmitReview = async () => {
@@ -255,13 +259,14 @@ function CoachEvaluationDetail() {
     }
     
     setIsSubmitting(true);
-    notifyScoreUpdate();
+    notifyScoreUpdate(false); // Don't show toast during submission
     try {
       console.log("Submitting review with:", {
         manualScores,
         criticalSkills,
         hasAdjustedScores: Object.keys(adjustedScores).length > 0,
-        feedbackLength: coachFeedback.length
+        feedbackLength: coachFeedback.length,
+        feedbackVideoUrl: feedbackVideoUrl
       });
       
       const response = await fetchWithAuth('/api/evaluations/update-status', {
@@ -270,6 +275,7 @@ function CoachEvaluationDetail() {
           evaluationId: id,
           status: 'published',
           feedback: coachFeedback,
+          feedbackVideoUrl: feedbackVideoUrl,
           manualScores: manualScores,
           criticalSkills: criticalSkills,
           adjustedScores: adjustedScores
@@ -359,19 +365,24 @@ function CoachEvaluationDetail() {
     );
   };
 
-  // Function to notify the ScoreSummaryTab about score updates
-  const notifyScoreUpdate = () => {
+  // Function to notify the ScoreSummaryTab about score updates (with debouncing)
+  const [lastNotificationTime, setLastNotificationTime] = useState<number>(0);
+  const notifyScoreUpdate = (showToast: boolean = false) => {
     setLastScoreUpdate(new Date());
     
     // Refresh the evaluation data to ensure we have the latest scores
     refetch();
     
-    // Show toast notification
-    toast({
-      title: "Scores Updated",
-      description: "Score data has been updated. Check the Summary tab for the latest scores.",
-      duration: 5000
-    });
+    // Only show toast notification if explicitly requested and not shown recently
+    const now = Date.now();
+    if (showToast && (now - lastNotificationTime) > 3000) { // 3 second debounce
+      setLastNotificationTime(now);
+      toast({
+        title: "Scores Updated",
+        description: "Score data has been updated. Check the Summary tab for the latest scores.",
+        duration: 3000 // Reduced duration
+      });
+    }
   };
 
   // Loading state
@@ -520,28 +531,28 @@ function CoachEvaluationDetail() {
               <ManualScoringTable 
                 evaluationId={id as string} 
                 skillType="nervousness" 
-                onScoresSaved={notifyScoreUpdate}
+                onScoresSaved={() => notifyScoreUpdate(false)} // Don't show toast for auto-saves
               />
             </TabsContent>
             <TabsContent value="voice" className="space-y-4">
               <ManualScoringTable 
                 evaluationId={id as string} 
                 skillType="voice" 
-                onScoresSaved={notifyScoreUpdate}
+                onScoresSaved={() => notifyScoreUpdate(false)} // Don't show toast for auto-saves
               />
             </TabsContent>
             <TabsContent value="bodyLanguage" className="space-y-4">
               <ManualScoringTable 
                 evaluationId={id as string} 
                 skillType="bodyLanguage" 
-                onScoresSaved={notifyScoreUpdate}
+                onScoresSaved={() => notifyScoreUpdate(false)} // Don't show toast for auto-saves
               />
             </TabsContent>
             <TabsContent value="expressions" className="space-y-4">
               <ManualScoringTable 
                 evaluationId={id as string} 
                 skillType="expressions" 
-                onScoresSaved={notifyScoreUpdate}
+                onScoresSaved={() => notifyScoreUpdate(false)} // Don't show toast for auto-saves
               />
             </TabsContent>
             <TabsContent value="language" className="space-y-4">
@@ -573,7 +584,7 @@ function CoachEvaluationDetail() {
               <ManualScoringTable 
                 evaluationId={id as string} 
                 skillType="ultimateLevel" 
-                onScoresSaved={notifyScoreUpdate}
+                onScoresSaved={() => notifyScoreUpdate(false)} // Don't show toast for auto-saves
               />
             </TabsContent>
             <TabsContent value="summary" className="space-y-4">
@@ -591,7 +602,9 @@ function CoachEvaluationDetail() {
             <TabsContent value="feedback" className="mt-6">
               <FeedbackSection 
                 coachFeedback={coachFeedback}
+                feedbackVideoUrl={feedbackVideoUrl}
                 onChange={setCoachFeedback}
+                onVideoUrlChange={setFeedbackVideoUrl}
                 onSubmit={handleSubmitReview}
                 isSubmitting={isSubmitting}
                 isCompleted={isCompleted}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Maximize2, Minimize2, Monitor } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface FloatingVideoPlayerProps {
@@ -13,18 +13,44 @@ export function FloatingVideoPlayer({
   onClose,
   initialPosition
 }: FloatingVideoPlayerProps) {
-  const [position, setPosition] = useState(initialPosition || { x: 20, y: 20 });
+  // Improved initial positioning - center-right of screen for better visibility
+  const getInitialPosition = () => {
+    if (initialPosition) return initialPosition;
+    
+    // Position it in the right side of the screen with some margin
+    const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+    const screenHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+    
+    return {
+      x: Math.max(screenWidth - 500, 20), // Right side with margin
+      y: 100 // Top with some margin for header
+    };
+  };
+
+  const [position, setPosition] = useState(getInitialPosition());
   const [isDragging, setIsDragging] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [sizeMode, setSizeMode] = useState<'medium' | 'large' | 'extra-large'>('large'); // Start with large by default
   const [startDragPos, setStartDragPos] = useState({ x: 0, y: 0 });
   const [videoError, setVideoError] = useState<string | null>(null);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   
-  // Calculate dimensions based on expanded state
-  const width = expanded ? 560 : 320;
-  const height = expanded ? 315 : 180;
+  // Much improved dimensions - significantly larger for better evaluation
+  const getDimensions = () => {
+    switch (sizeMode) {
+      case 'medium':
+        return { width: 520, height: 390 }; // Increased both width and height
+      case 'large':
+        return { width: 720, height: 540 }; // Much larger for better evaluation
+      case 'extra-large':
+        return { width: 960, height: 720 }; // Very large for detailed analysis
+      default:
+        return { width: 720, height: 540 };
+    }
+  };
+
+  const { width, height } = getDimensions();
 
   // Start dragging the video player
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -54,10 +80,33 @@ export function FloatingVideoPlayer({
     setIsDragging(false);
   };
 
-  // Toggle expanded/minimized state
-  const toggleExpanded = () => {
-    setExpanded(!expanded);
+  // Cycle through size modes
+  const cycleSizeMode = () => {
+    setSizeMode(current => {
+      switch (current) {
+        case 'medium': return 'large';
+        case 'large': return 'extra-large';
+        case 'extra-large': return 'medium';
+        default: return 'large';
+      }
+    });
   };
+
+  // Get size mode icon and label
+  const getSizeModeInfo = () => {
+    switch (sizeMode) {
+      case 'medium':
+        return { icon: Minimize2, label: 'Medium' };
+      case 'large':
+        return { icon: Maximize2, label: 'Large' };
+      case 'extra-large':
+        return { icon: Monitor, label: 'Extra Large' };
+      default:
+        return { icon: Maximize2, label: 'Large' };
+    }
+  };
+
+  const { icon: SizeIcon, label: sizeLabel } = getSizeModeInfo();
 
   // Set up and clean up event listeners
   useEffect(() => {
@@ -87,7 +136,7 @@ export function FloatingVideoPlayer({
     if (position.y < 0) setPosition(prev => ({ ...prev, y: 0 }));
     if (position.x > maxX) setPosition(prev => ({ ...prev, x: maxX }));
     if (position.y > maxY) setPosition(prev => ({ ...prev, y: maxY }));
-  }, [position, expanded]);
+  }, [position, sizeMode]);
 
   // Handle video errors
   const handleVideoError = () => {
@@ -108,53 +157,64 @@ export function FloatingVideoPlayer({
   return (
     <div 
       ref={containerRef}
-      className={`fixed z-50 rounded-lg overflow-hidden shadow-xl transition-all duration-200 bg-white border border-gray-200 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+      className={`fixed z-50 rounded-lg overflow-hidden shadow-2xl transition-all duration-300 bg-white border-2 border-gray-300 flex flex-col ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
         width: `${width}px`,
+        height: `${height + 90}px`, // Add extra height for header and tip section
       }}
     >
-      {/* Header for dragging */}
+      {/* Enhanced header for dragging with better visibility */}
       <div 
-        className="bg-gray-800 text-white px-3 py-2 flex items-center justify-between cursor-grab"
+        className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 flex items-center justify-between cursor-grab shadow-md"
         onMouseDown={handleMouseDown}
       >
-        <h3 className="text-sm font-medium truncate">
-          {videoError ? "Video Error" : "Student Video"}
-        </h3>
+        <div className="flex items-center space-x-2">
+          <h3 className="text-sm font-semibold truncate">
+            {videoError ? "Video Error" : "Student Video"}
+          </h3>
+          <span className="text-xs bg-blue-500 px-2 py-1 rounded-full">
+            {sizeLabel}
+          </span>
+        </div>
         <div className="flex items-center space-x-1">
           <Button 
             variant="ghost" 
             size="icon" 
-            onClick={toggleExpanded}
-            className="h-6 w-6 text-white hover:bg-gray-700"
+            onClick={cycleSizeMode}
+            className="h-7 w-7 text-white hover:bg-blue-600"
+            title={`Switch to ${sizeMode === 'medium' ? 'Large' : sizeMode === 'large' ? 'Extra Large' : 'Medium'} size`}
           >
-            {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            <SizeIcon className="h-4 w-4" />
           </Button>
           <Button 
             variant="ghost" 
             size="icon" 
             onClick={onClose}
-            className="h-6 w-6 text-white hover:bg-gray-700"
+            className="h-7 w-7 text-white hover:bg-red-500"
+            title="Close video player"
           >
             <X className="h-4 w-4" />
           </Button>
         </div>
       </div>
       
-      <div className="bg-black">
+      {/* Video content with improved styling - FIXED to fill available space */}
+      <div 
+        className="bg-black border-t border-gray-200 flex-1"
+        style={{ height: `${height}px` }}
+      >
         {videoError ? (
           <div 
-            className="flex items-center justify-center text-white bg-gray-900"
-            style={{ width, height }}
+            className="flex items-center justify-center text-white bg-gray-900 w-full h-full"
           >
-            <div className="text-center p-4">
-              <p className="mb-2">{videoError}</p>
+            <div className="text-center p-6">
+              <p className="mb-3 text-lg">{videoError}</p>
               <Button 
                 size="sm" 
                 variant="outline" 
-                className="text-xs text-white border-white hover:bg-gray-800"
+                className="text-white border-white hover:bg-gray-800"
                 onClick={() => setVideoError(null)}
               >
                 Try Again
@@ -164,8 +224,6 @@ export function FloatingVideoPlayer({
         ) : (
           <iframe
             ref={iframeRef}
-            width={width}
-            height={height}
             src={embedUrl}
             title="YouTube video player"
             frameBorder="0"
@@ -173,8 +231,14 @@ export function FloatingVideoPlayer({
             allowFullScreen
             onError={handleVideoError}
             className="w-full h-full"
+            style={{ width: '100%', height: '100%' }}
           ></iframe>
         )}
+      </div>
+      
+      {/* Add a subtle hint for coaches */}
+      <div className="bg-gradient-to-r from-blue-50 to-blue-100 px-3 py-2 text-xs text-blue-700 border-t border-blue-200">
+        <span className="font-medium">💡 Tip:</span> Click the resize button to adjust video size for better evaluation
       </div>
     </div>
   );

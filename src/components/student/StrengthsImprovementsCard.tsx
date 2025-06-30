@@ -37,8 +37,8 @@ export function StrengthsImprovementsCard({ criticalSkills, expanded = false }: 
   const improvements = criticalSkillDetails.filter((skill: any) => !skill?.isGoodSkill);
 
   return (
-    <Card className="mb-6">
-      <CardHeader>
+    <Card className="mb-6 bg-white">
+      <CardHeader className="bg-white rounded-t-lg">
         <CardTitle>Your Key Strengths & Improvement Areas</CardTitle>
         <CardDescription>
           Based on your coach's evaluation of your presentation skills

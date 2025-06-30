@@ -466,3 +466,43 @@ export async function transcribeEvaluationVideo(evaluationId: string, videoId: s
     throw error;
   }
 }
+
+// Add a function to fetch the latest completed evaluation for a student
+export async function fetchLatestCompletedEvaluation(): Promise<{ evaluation: Evaluation | null; hasCompletedEvaluations: boolean }> {
+  try {
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch('/api/evaluations/latest-completed', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
+
+    if (response.status === 404) {
+      // No completed evaluations found
+      return { evaluation: null, hasCompletedEvaluations: false };
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to fetch latest completed evaluation');
+    }
+
+    const data = await response.json();
+    return { 
+      evaluation: data.evaluation, 
+      hasCompletedEvaluations: data.hasCompletedEvaluations 
+    };
+  } catch (error) {
+    console.error('Error fetching latest completed evaluation:', error);
+    throw error;
+  }
+}

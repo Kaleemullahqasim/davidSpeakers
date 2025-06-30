@@ -100,11 +100,16 @@ export function ScoreSummaryTab({ evaluation, refreshTrigger }: ScoreSummaryTabP
     } catch (err) {
       console.error("Error fetching scores:", err);
       setError(err instanceof Error ? err.message : 'Failed to load scores');
-      toast({
-        title: "Error loading scores",
-        description: err instanceof Error ? err.message : 'Failed to load scores',
-        variant: "destructive"
-      });
+      
+      // Only show error toast if it's a genuine error, not just missing data
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load scores';
+      if (!errorMessage.includes('No scores found') && !errorMessage.includes('missing')) {
+        toast({
+          title: "Issue loading scores",
+          description: "Some scores may not be visible. Try refreshing if needed.",
+          duration: 3000,
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -165,7 +170,8 @@ export function ScoreSummaryTab({ evaluation, refreshTrigger }: ScoreSummaryTabP
       
       toast({
         title: "Divider Updated",
-        description: `Divider changed to ${dividerValue}. New final score: ${data.updatedFinalScore ? data.updatedFinalScore.toFixed(2) : data.finalScore.toFixed(2)}`,
+        description: `New final score: ${data.updatedFinalScore ? data.updatedFinalScore.toFixed(2) : data.finalScore.toFixed(2)}`,
+        duration: 2000, // Shorter duration
       });
       
       // Force a full refresh to ensure all data is up to date

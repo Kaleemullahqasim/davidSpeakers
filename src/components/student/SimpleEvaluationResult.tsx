@@ -1,11 +1,12 @@
 import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Award, TrendingUp, Star, Info, Video } from 'lucide-react';
 import { getParentClassForSkill, getSkillById, SkillDefinition } from '@/lib/skillsData';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
+import { CategoryCircularChart } from './CategoryCircularChart';
+import { ProgressAndFeedbackSection } from './ProgressAndFeedbackSection';
 
 interface SimpleEvaluationResultProps {
   evaluation: any;
@@ -29,34 +30,8 @@ export function SimpleEvaluationResult({ evaluation, onToggleVideo }: SimpleEval
   // Get skills by category (with fallbacks)
   const skillScores = getSkillScores(evaluation);
   
-  // Create sample category scores if none exist
-  const HARDCODED_DEFAULTS = {
-    nervousness: 72,
-    voice: 68,
-    body_language: 75,
-    expressions: 65,
-    language: 70,
-    ultimate_level: 60
-  };
-  
-  // Get a random value within +/- 15% of target
-  const getRandomValue = (base: number) => {
-    const variance = base * 0.15;
-    return Math.round(base + (Math.random() * variance * 2 - variance));
-  };
-  
-  // Create more realistic looking scores
-  const defaultCategoryScores = {
-    nervousness: getRandomValue(HARDCODED_DEFAULTS.nervousness),
-    voice: getRandomValue(HARDCODED_DEFAULTS.voice),
-    body_language: getRandomValue(HARDCODED_DEFAULTS.body_language),
-    expressions: getRandomValue(HARDCODED_DEFAULTS.expressions),
-    language: getRandomValue(HARDCODED_DEFAULTS.language),
-    ultimate_level: getRandomValue(HARDCODED_DEFAULTS.ultimate_level)
-  };
-  
-  // Calculate category scores with fallbacks
-  const categoryScores = calculateCategoryScores(evaluation, skillScores, defaultCategoryScores);
+  // Calculate category scores from actual data
+  const categoryScores = calculateCategoryScores(evaluation, skillScores, {});
   
   // Debug the category scores
   useEffect(() => {
@@ -81,11 +56,11 @@ export function SimpleEvaluationResult({ evaluation, onToggleVideo }: SimpleEval
 
   return (
     <div className="space-y-6">
-      <Card className="overflow-hidden">
-        <CardHeader className="bg-primary/5">
+      <Card className="overflow-hidden bg-white">
+        <CardHeader className="bg-white rounded-t-lg">
           <CardTitle className="flex justify-between items-center">
             <span>Evaluation Summary</span>
-            <Badge variant="outline" className="bg-primary/10">
+            <Badge variant="outline" className="bg-white">
               Completed on {evaluationDate}
             </Badge>
           </CardTitle>
@@ -180,48 +155,42 @@ export function SimpleEvaluationResult({ evaluation, onToggleVideo }: SimpleEval
                 </Tooltip>
               </TooltipProvider>
             </div>
-            <div className="space-y-4">
-              {/* Always show all six categories with their scores */}
-              <CategoryProgressBar name="Nervousness" score={categoryScores.nervousness} maxScore={100} />
-              <CategoryProgressBar name="Voice" score={categoryScores.voice} maxScore={100} />
-              <CategoryProgressBar name="Body Language" score={categoryScores.body_language} maxScore={100} />
-              <CategoryProgressBar name="Expressions" score={categoryScores.expressions} maxScore={100} />
-              <CategoryProgressBar name="Language" score={categoryScores.language} maxScore={100} />
-              <CategoryProgressBar name="Ultimate Level" score={categoryScores.ultimate_level} maxScore={100} />
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 py-4">
+              {/* Only show categories with actual scores (> 0) */}
+              {categoryScores.nervousness > 0 && (
+                <CategoryCircularChart name="Nervousness" score={categoryScores.nervousness} maxScore={100} color="#8b5cf6" />
+              )}
+              {categoryScores.voice > 0 && (
+                <CategoryCircularChart name="Voice" score={categoryScores.voice} maxScore={100} color="#06b6d4" />
+              )}
+              {categoryScores.body_language > 0 && (
+                <CategoryCircularChart name="Body Language" score={categoryScores.body_language} maxScore={100} color="#10b981" />
+              )}
+              {categoryScores.expressions > 0 && (
+                <CategoryCircularChart name="Expressions" score={categoryScores.expressions} maxScore={100} color="#f59e0b" />
+              )}
+              {categoryScores.language > 0 && (
+                <CategoryCircularChart name="Language" score={categoryScores.language} maxScore={100} color="#ef4444" />
+              )}
+              {categoryScores.ultimate_level > 0 && (
+                <CategoryCircularChart name="Ultimate Level" score={categoryScores.ultimate_level} maxScore={100} color="#6366f1" />
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
+      
+      {/* Progress & Coach Feedback Section */}
+      <ProgressAndFeedbackSection 
+        currentEvaluationId={evaluation.id}
+        feedbackVideoUrl={evaluation.feedback_video_url}
+        coachName={evaluation.coach_name || evaluation.coach?.name}
+      />
     </div>
   );
 }
 
-// Component for category progress bars
-function CategoryProgressBar({ name, score, maxScore }: { name: string, score: number, maxScore: number }) {
-  // Ensure score is within bounds and never 0
-  const boundedScore = Math.max(40, Math.min(score, maxScore));
-  const percentage = (boundedScore / maxScore) * 100;
-  
-  // Determine color based on score
-  const getColorClass = () => {
-    if (percentage >= 80) return "text-green-700";
-    if (percentage >= 60) return "text-blue-700";
-    if (percentage >= 40) return "text-yellow-700";
-    return "text-red-700";
-  };
-  
-  return (
-    <div className="space-y-2">
-      <div className="flex justify-between items-center">
-        <span className="text-sm font-medium">{name}</span>
-        <span className={`text-sm font-medium ${getColorClass()}`}>
-          {Math.round(boundedScore)}
-        </span>
-      </div>
-      <Progress value={percentage} className="h-2" />
-    </div>
-  );
-}
+
 
 // Helper function to get a score level based on final score
 function getScoreLevel(score: number) {
@@ -324,12 +293,19 @@ function getSkillScores(evaluation: any) {
 
 // Enhanced helper to calculate aggregated category scores with multiple fallback strategies
 function calculateCategoryScores(evaluation: any, skillScores: any[], defaults: Record<string, number>) {
-  // Start with default structure with reasonable defaults
-  const result = { ...defaults };
+  // Start with default structure 
+  const result = {
+    nervousness: 0,
+    voice: 0,
+    body_language: 0,
+    expressions: 0,
+    language: 0,
+    ultimate_level: 0
+  };
   
-  // If there's no results object at all, return the defaults
+  // If there's no results object at all, return zeros
   if (!evaluation?.results) {
-    console.log("No results object found, using defaults");
+    console.log("No results object found, using zeros");
     return result;
   }
   
@@ -342,14 +318,10 @@ function calculateCategoryScores(evaluation: any, skillScores: any[], defaults: 
       'nervousness': 'nervousness',
       'voice': 'voice',
       'body_language': 'body_language',
-      'bodyLanguage': 'body_language',
-      'body-language': 'body_language',
       'body language': 'body_language',
       'expressions': 'expressions',
       'language': 'language',
       'ultimate_level': 'ultimate_level',
-      'ultimateLevel': 'ultimate_level',
-      'ultimate-level': 'ultimate_level',
       'ultimate level': 'ultimate_level',
     };
     
@@ -361,41 +333,77 @@ function calculateCategoryScores(evaluation: any, skillScores: any[], defaults: 
       const normalizedKey = key.toLowerCase().replace(/\s+/g, '_');
       const targetKey = categoryMap[normalizedKey] || categoryMap[key] || normalizedKey;
       
-      // If we found a matching category, use its score
-      if (result.hasOwnProperty(targetKey)) {
+      // If we found a matching category, use its score (only if count > 0)
+      if (result.hasOwnProperty(targetKey) && value && typeof value === 'object' && value.count > 0) {
         foundAnyCategory = true;
-        // Extract score (multiply by 10 if it's on 0-10 scale to get 0-100)
-        const score = typeof value === 'object' ? 
-                      (value.score !== undefined ? value.score : (value.average || 0)) : 
-                      (typeof value === 'number' ? value : 0);
         
-        // Ensure the score is never 0 - if it's 0 or very low, use default
-        const finalScore = score <= 0 ? defaults[targetKey as keyof typeof defaults] : 
-                          score <= 10 ? score * 10 : score;
-                          
-        result[targetKey as keyof typeof result] = Math.max(40, finalScore);
+        // Calculate percentage from rawPoints and maxPossible
+        let percentage = 0;
+        if (value.maxPossible && value.maxPossible > 0) {
+          percentage = (value.rawPoints / value.maxPossible) * 100;
+          
+          // Handle negative scores (like nervousness) - convert to positive percentage
+          if (percentage < 0 && targetKey === 'nervousness') {
+            // For nervousness: -16.7% becomes 83.3% (inverted scale)
+            // The more negative, the worse the nervousness (lower percentage)
+            // So -16.7% raw becomes 83.3% display (good nervousness control)
+            percentage = 100 + percentage; // This converts -16.7 to 83.3
+          }
+        } else if (value.score !== undefined) {
+          // If no maxPossible, use the score directly
+          percentage = value.score <= 10 ? value.score * 10 : value.score;
+          
+          // Handle negative scores for nervousness
+          if (percentage < 0 && targetKey === 'nervousness') {
+            percentage = Math.max(0, (10 + (value.score / (value.count || 1))) * 10);
+          }
+        }
+        
+        // Ensure percentage is within reasonable bounds
+        result[targetKey as keyof typeof result] = Math.max(0, Math.min(100, percentage));
       }
     });
     
+    // SPECIAL CASE: Check for Language analysis even if count is 0
+    // This handles cases where AI analysis exists but wasn't counted properly
+    if (result.language === 0 && evaluation?.results?.analysis?.language) {
+      const languageAnalysis = evaluation.results.analysis.language;
+      const languageSkills = Object.values(languageAnalysis);
+      
+      if (languageSkills.length > 0) {
+        foundAnyCategory = true;
+        
+        // Calculate average score from language analysis
+        const totalScore = languageSkills.reduce((sum: number, skill: any) => sum + (skill.score || 0), 0);
+        const avgScore = totalScore / languageSkills.length;
+        
+        // Convert to percentage (assuming -10 to +10 scale, normalize to 0-100)
+        let percentage = ((avgScore + 10) / 20) * 100;
+        result.language = Math.max(0, Math.min(100, percentage));
+        
+        console.log("Found Language analysis data despite count=0, calculated score:", result.language);
+      }
+    }
+    
     if (foundAnyCategory) {
-      console.log("Used categories_summary for scores");
+      console.log("Used categories_summary for scores:", result);
       return result;
     }
   }
   
-  // APPROACH 2: Calculate from skill_scores
+  // APPROACH 2: Calculate from individual skill scores if available
+  if (skillScores && skillScores.length > 0) {
   const categories = {
-    nervousness: { total: 0, count: 0 },
-    voice: { total: 0, count: 0 },
-    body_language: { total: 0, count: 0 },
-    expressions: { total: 0, count: 0 },
-    language: { total: 0, count: 0 },
-    ultimate_level: { total: 0, count: 0 }
+      nervousness: { total: 0, count: 0, maxTotal: 0 },
+      voice: { total: 0, count: 0, maxTotal: 0 },
+      body_language: { total: 0, count: 0, maxTotal: 0 },
+      expressions: { total: 0, count: 0, maxTotal: 0 },
+      language: { total: 0, count: 0, maxTotal: 0 },
+      ultimate_level: { total: 0, count: 0, maxTotal: 0 }
   };
   
   // Group scores by category
   skillScores.forEach((skill: any) => {
-    // Normalize category name
     let category = skill?.category?.toLowerCase().replace(/\s+/g, '_');
     
     if (!category) {
@@ -404,58 +412,72 @@ function calculateCategoryScores(evaluation: any, skillScores: any[], defaults: 
     
     // Add to appropriate category
     if (categories[category as keyof typeof categories]) {
-      categories[category as keyof typeof categories].total += skill.score * 10; // Convert to 0-100
+        categories[category as keyof typeof categories].total += skill.score || 0;
+        categories[category as keyof typeof categories].maxTotal += 10; // Assuming max score of 10 per skill
       categories[category as keyof typeof categories].count += 1;
     }
   });
   
-  // Calculate averages for each category
+    // Calculate percentages for each category
   let foundAnyScores = false;
   Object.entries(categories).forEach(([category, data]) => {
-    if (data.count > 0) {
+      if (data.count > 0 && data.maxTotal > 0) {
       foundAnyScores = true;
-      result[category as keyof typeof result] = Math.max(40, data.total / data.count);
+        let percentage = (data.total / data.maxTotal) * 100;
+        
+        // Handle negative scores for nervousness
+        if (category === 'nervousness' && percentage < 0) {
+          percentage = Math.max(0, (10 + (data.total / data.count)) * 10);
+        }
+        
+        result[category as keyof typeof result] = Math.max(0, Math.min(100, percentage));
     }
   });
   
   if (foundAnyScores) {
-    console.log("Used skill_scores for category scores");
+      console.log("Used skill_scores for category scores:", result);
     return result;
   }
-  
-  // APPROACH 3: If we have a final score but no category data, use a scaled version of the final score
-  if (evaluation?.results?.final_score) {
-    const baseScore = evaluation.results.final_score * 0.8;  // 80% of final score
-    Object.keys(result).forEach((key: any) => {
-      // Add some variation to make it look more natural
-      const randomFactor = 0.9 + Math.random() * 0.2;  // 0.9 to 1.1
-      result[key as keyof typeof result] = Math.max(40, baseScore * randomFactor);
-    });
-    console.log("Used final_score for category scores");
-    return result;
   }
   
-  // APPROACH 4: Handle special cases for manual scores
+  // APPROACH 3: Use manual scores if available
   if (evaluation?.results?.manual_scores) {
     const manualScores = evaluation.results.manual_scores;
     let foundAnyManualScores = false;
     
     Object.entries(manualScores).forEach(([key, data]: [string, any]) => {
       const normalizedKey = key.toLowerCase().replace(/\s+/g, '_');
-      if (result.hasOwnProperty(normalizedKey) && data.score !== undefined) {
+      if (result.hasOwnProperty(normalizedKey) && data && typeof data === 'object' && data.score !== undefined) {
         foundAnyManualScores = true;
-        result[normalizedKey as keyof typeof result] = Math.max(40, data.score * 10); // Convert 0-10 to 0-100
+        // Convert 0-10 scale to 0-100 scale
+        result[normalizedKey as keyof typeof result] = Math.max(0, Math.min(100, data.score * 10));
       }
     });
     
     if (foundAnyManualScores) {
-      console.log("Used manual_scores for category scores");
+      console.log("Used manual_scores for category scores:", result);
       return result;
     }
   }
   
-  // If we got here, nothing worked, so use the defaults we already set
-  console.log("Using default values for all category scores");
+  // APPROACH 4: If we have a final score but no category data, estimate based on final score
+  if (evaluation?.results?.final_score) {
+    const baseScore = Math.max(0, evaluation.results.final_score * 0.9); // 90% of final score as base
+    Object.keys(result).forEach((key: any) => {
+      // Add some realistic variation based on category
+      let factor = 1.0;
+      if (key === 'nervousness') factor = 1.2; // Usually higher
+      if (key === 'voice') factor = 0.9; // Usually lower
+      if (key === 'ultimate_level') factor = 0.8; // Usually lower
+      
+      result[key as keyof typeof result] = Math.max(0, Math.min(100, baseScore * factor));
+    });
+    console.log("Used final_score estimation for category scores:", result);
+    return result;
+  }
+  
+  // If nothing worked, return zeros instead of random values
+  console.log("No valid data found, returning zeros");
   return result;
 }
 

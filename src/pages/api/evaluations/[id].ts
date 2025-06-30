@@ -33,11 +33,43 @@ export default async function handler(
     // Log for debugging
     console.log(`API: Fetching evaluation ${evaluationId} with token ${token.substring(0, 10)}...`);
     
-    // Verify token and get user
-    const { data: userData, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !userData?.user) {
+    // Verify token and get user with better error handling
+    let userData;
+    try {
+      const { data, error: authError } = await supabase.auth.getUser(token);
+      if (authError) {
       console.error('Auth error:', authError);
-      return res.status(401).json({ message: 'Authentication failed', details: authError?.message });
+        // Try to refresh or provide more specific error
+        if (authError.message?.includes('invalid') || authError.message?.includes('expired')) {
+          return res.status(401).json({ 
+            message: 'Token expired or invalid', 
+            details: 'Please refresh the page and try again',
+            code: 'TOKEN_EXPIRED'
+          });
+        }
+        return res.status(401).json({ 
+          message: 'Authentication failed', 
+          details: authError.message,
+          code: 'AUTH_FAILED'
+        });
+      }
+      
+      if (!data?.user) {
+        return res.status(401).json({ 
+          message: 'User not found', 
+          details: 'Invalid authentication token',
+          code: 'USER_NOT_FOUND'
+        });
+      }
+      
+      userData = data;
+    } catch (error) {
+      console.error('Network error during auth:', error);
+      return res.status(503).json({ 
+        message: 'Authentication service temporarily unavailable', 
+        details: 'Please try again in a moment',
+        code: 'SERVICE_UNAVAILABLE'
+      });
     }
     
     // Check user role from users table

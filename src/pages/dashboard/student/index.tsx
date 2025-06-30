@@ -57,6 +57,7 @@ export default function StudentDashboard() {
   const router = useRouter();
   const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
+  const [hasCheckedForRedirect, setHasCheckedForRedirect] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -72,6 +73,61 @@ export default function StudentDashboard() {
     enabled: !!user?.id && mounted, // Ensure user and mount before fetching
     refetchInterval: 30000, // Refetch every 30 seconds
   });
+
+  // 🔥 NEW: Redirect logic for students to go to their latest completed evaluation
+  useEffect(() => {
+    const redirectToLatestEvaluation = async () => {
+      // Only run this once when the component mounts and user is loaded
+      if (!mounted || authLoading || !user || user.role !== 'student' || hasCheckedForRedirect) {
+        return;
+      }
+
+      // Wait for evaluations to be loaded first
+      if (evaluationsLoading || !evaluations) {
+        return;
+      }
+
+      console.log('🚀 StudentDashboard: Checking for latest completed evaluation to redirect...');
+      setHasCheckedForRedirect(true);
+
+      try {
+        // Use the existing evaluations data to find the latest completed one
+        console.log('📊 Available evaluations:', evaluations.map(e => ({ 
+          id: e.id.slice(0, 8), 
+          status: e.status, 
+          completed_at: e.completed_at 
+        })));
+        
+        // Find evaluations that are completed by coach (same logic as the "Recent Evaluations" section)
+        const completedByCoach = evaluations
+          .filter(evaluation => ['completed', 'reviewed', 'published'].includes(evaluation.status))
+          .filter(evaluation => evaluation.completed_at) // Must have completion date
+          .sort((a, b) => new Date(b.completed_at || b.created_at).getTime() - 
+                          new Date(a.completed_at || a.created_at).getTime());
+        
+        console.log('📊 Completed evaluations found:', completedByCoach.map(e => ({ 
+          id: e.id.slice(0, 8), 
+          status: e.status, 
+          completed_at: e.completed_at 
+        })));
+        
+        if (completedByCoach.length > 0) {
+          const latestEvaluation = completedByCoach[0];
+          console.log(`✅ Found latest completed evaluation! Redirecting to: /dashboard/student/evaluations/${latestEvaluation.id}`);
+          console.log(`   Status: ${latestEvaluation.status}, Completed: ${latestEvaluation.completed_at}`);
+          router.push(`/dashboard/student/evaluations/${latestEvaluation.id}`);
+          return; // Don't continue with dashboard rendering
+        } else {
+          console.log('❌ No completed evaluations found, staying on student dashboard');
+        }
+      } catch (error) {
+        console.error('💥 Error checking for latest evaluation:', error);
+        console.log('🔄 Staying on student dashboard due to error');
+      }
+    };
+
+    redirectToLatestEvaluation();
+  }, [mounted, authLoading, user, router, hasCheckedForRedirect, evaluations, evaluationsLoading]);
 
   // Log any errors for debugging
   useEffect(() => {

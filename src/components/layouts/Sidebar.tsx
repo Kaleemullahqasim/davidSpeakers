@@ -13,7 +13,8 @@ import {
   X,
   User, 
   Award,
-  Headphones
+  Headphones,
+  Upload
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -67,6 +68,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
         // Default to student navigation if role is not recognized
         return [
           { href: '/dashboard/student', label: 'Dashboard', icon: <Home className="h-5 w-5" /> },
+          { href: '/dashboard/student/submit', label: 'Video Submission', icon: <Upload className="h-5 w-5" /> },
           { href: '/dashboard/student/evaluations', label: 'My Evaluations', icon: <VideoIcon className="h-5 w-5" /> },
           { href: '/dashboard/student/resources', label: 'Learning Resources', icon: <Book className="h-5 w-5" /> },
         ];

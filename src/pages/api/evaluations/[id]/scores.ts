@@ -9,9 +9,9 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // Map skill type to ID ranges
 const skillTypeRanges = {
   nervousness: { min: 1, max: 6 },
-  voice: { min: 7, max: 24 },
-  bodyLanguage: { min: 25, max: 59 },
-  expressions: { min: 60, max: 84 },
+  voice: { min: 7, max: 32 },
+  bodyLanguage: { min: 33, max: 75 },
+  expressions: { min: 76, max: 84 },
   language: { min: 85, max: 102 },
   ultimateLevel: { min: 103, max: 110 }
 };
@@ -31,11 +31,12 @@ export default async function handler(
       return res.status(400).json({ message: 'Missing evaluation ID' });
     }
 
-    if (!type || typeof type !== 'string' || !skillTypeRanges[type as keyof typeof skillTypeRanges]) {
-      return res.status(400).json({ message: 'Invalid or missing skill type' });
+    // If no type is specified, fetch all scores
+    if (type && typeof type === 'string' && !skillTypeRanges[type as keyof typeof skillTypeRanges]) {
+      return res.status(400).json({ message: 'Invalid skill type' });
     }
 
-    console.log(`Fetching ${type} scores for evaluation ${id}`);
+    console.log(`Fetching ${type || 'all'} scores for evaluation ${id}`);
     
     // Get the authorization header to verify identity
     const authHeader = req.headers.authorization;
@@ -71,23 +72,42 @@ export default async function handler(
       return res.status(403).json({ message: 'You do not have permission to access this evaluation' });
     }
     
-    // Get the skill range for the requested type
-    const range = skillTypeRanges[type as keyof typeof skillTypeRanges];
+    let scores;
+    let scoresError;
+    let range;
     
-    // Get scores for the skill type
-    const { data: scores, error: scoresError } = await supabase
-      .from('skill_settings_and_scores')
-      .select('*')
-      .eq('evaluation_id', id)
-      .gte('skill_id', range.min)
-      .lte('skill_id', range.max);
+    if (type) {
+      // Get the skill range for the requested type
+      range = skillTypeRanges[type as keyof typeof skillTypeRanges];
+      
+      // Get scores for the specific skill type
+      const result = await supabase
+        .from('skill_settings_and_scores')
+        .select('*')
+        .eq('evaluation_id', id)
+        .gte('skill_id', range.min)
+        .lte('skill_id', range.max);
+      
+      scores = result.data;
+      scoresError = result.error;
+    } else {
+      // Get all scores for the evaluation
+      const result = await supabase
+        .from('skill_settings_and_scores')
+        .select('*')
+        .eq('evaluation_id', id);
+      
+      scores = result.data;
+      scoresError = result.error;
+      range = null;
+    }
     
     if (scoresError) {
       console.error('Error fetching scores:', scoresError);
       return res.status(500).json({ message: 'Failed to fetch scores', details: scoresError.message });
     }
     
-    console.log(`Found ${scores?.length || 0} scores for ${type} skills`);
+    console.log(`Found ${scores?.length || 0} scores for ${type || 'all'} skills`);
     
     return res.status(200).json({
       scores: scores || [],

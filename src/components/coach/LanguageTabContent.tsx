@@ -31,6 +31,7 @@ export function LanguageTabContent({
   const [isAnalyzing, setIsAnalyzing] = useState(propIsAnalyzing);
   const [error, setError] = useState('');
   const [showAiTable, setShowAiTable] = useState(hasAnalysis);
+  const [isSavingScores, setIsSavingScores] = useState(false);
   const { toast } = useToast();
 
   // Always log current state and props for debugging
@@ -48,6 +49,60 @@ export function LanguageTabContent({
       console.log("Analysis keys:", Object.keys(evaluation.results.analysis));
     }
   }, [evaluationId, hasAnalysis, hasTranscript, evaluation, isAnalyzing, showAiTable]);
+
+  // Function to save language scores to the database
+  const handleSaveLanguageScores = async () => {
+    setIsSavingScores(true);
+    setError('');
+    
+    try {
+      console.log('SAVING LANGUAGE SCORES for evaluation:', evaluationId);
+      
+      toast({
+        title: 'Saving Language Scores',
+        description: 'Converting AI analysis to scores and saving to database...',
+      });
+      
+      const response = await fetchWithAuth(`/api/evaluations/save-language-scores`, {
+        method: 'POST',
+        body: JSON.stringify({
+          evaluationId
+        }),
+      });
+      
+      console.log('Save language scores response status:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error saving language scores:', errorData);
+        throw new Error(errorData.message || 'Failed to save language scores');
+      }
+
+      const data = await response.json();
+      console.log('Language scores saved successfully:', data);
+      
+      toast({
+        title: 'Language Scores Saved!',
+        description: `Successfully saved ${data.savedScores} language skill scores. Final score updated to ${data.finalScore.toFixed(2)}/110.`,
+        variant: 'default',
+      });
+      
+      // Notify parent component about the score update
+      onAnalysisComplete(evaluation?.results?.analysis);
+      
+    } catch (err) {
+      console.error('Error saving language scores:', err);
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      
+      toast({
+        title: 'Failed to Save Language Scores',
+        description: err instanceof Error ? err.message : 'Failed to save language scores to database',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSavingScores(false);
+    }
+  };
 
   // Function to trigger the AI analysis using Google Gemini
   const handleRunAnalysis = async () => {
@@ -118,7 +173,17 @@ export function LanguageTabContent({
   if (showAiTable && evaluation?.results?.analysis) {
     return (
       <div className="space-y-4">
-        <div className="flex justify-end">
+        <div className="flex justify-between items-center">
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleSaveLanguageScores}
+              disabled={isSavingScores}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              <Zap className="h-4 w-4 mr-2" />
+              {isSavingScores ? 'Saving Language Scores...' : 'Save Language Scores to Database'}
+            </Button>
+          </div>
           <Button 
             variant="outline" 
             size="sm" 
@@ -129,6 +194,22 @@ export function LanguageTabContent({
             Run Analysis Again
           </Button>
         </div>
+        
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
+        <Alert className="mb-4 border-green-500 bg-green-50">
+          <AlertCircle className="h-4 w-4 text-green-600" />
+          <AlertTitle className="text-green-800">Important: Save Language Scores</AlertTitle>
+          <AlertDescription className="text-green-700">
+            After reviewing the AI analysis results, click "Save Language Scores to Database" to include these scores in the final evaluation and make them visible to students.
+          </AlertDescription>
+        </Alert>
         
         <AIScoreTable 
           evaluationId={evaluationId}

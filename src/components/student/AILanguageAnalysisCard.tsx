@@ -10,7 +10,8 @@ import {
   ThumbsUp, 
   ThumbsDown,
   Info,
-  Lightbulb
+  Lightbulb,
+  Bot
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -32,8 +33,8 @@ export function AILanguageAnalysisCard({ evaluation, expanded = false }: AILangu
   // If no analysis data is available
   if (!hasLanguageAnalysis || Object.keys(hasLanguageAnalysis).length === 0) {
     return (
-      <Card>
-        <CardHeader>
+      <Card className="bg-white">
+        <CardHeader className="bg-white rounded-t-lg">
           <CardTitle className="flex items-center gap-2">
             <MessageSquare className="h-5 w-5 text-primary" />
             Language Analysis
@@ -80,24 +81,51 @@ export function AILanguageAnalysisCard({ evaluation, expanded = false }: AILangu
     hasLanguageAnalysis[selectedSkill] : null;
   
   return (
-    <Card>
-      <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
-        <CardTitle className="flex justify-between items-center">
+    <Card className="bg-white">
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-blue-600" />
-            <span>Language Skill Analysis</span>
+            <Bot className="h-5 w-5 text-green-600" />
+            AI Language Analysis
           </div>
-          <Badge variant="outline" className="bg-blue-100 text-blue-800">
-            {Object.keys(hasLanguageAnalysis).length} skills analyzed
-          </Badge>
+          {!expanded && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          )}
         </CardTitle>
         <CardDescription>
-          Detailed analysis of your language skills by Google Gemini AI
+          Google Gemini AI analysis of language patterns and rhetorical devices in your speech
         </CardDescription>
       </CardHeader>
       
+      {!hasLanguageAnalysis || Object.keys(hasLanguageAnalysis).length === 0 ? (
+        <CardContent>
+          <Card className="bg-white">
+            <CardHeader>
+              <CardTitle className="text-center text-gray-600">No AI Analysis Available</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center py-6">
+              <Bot className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <p className="text-gray-600 mb-4">
+                This evaluation doesn't have AI language analysis yet. 
+                This feature analyzes rhetorical devices and language patterns in your speech.
+              </p>
+              <Badge variant="outline" className="bg-gray-50">
+                Manual evaluation only
+              </Badge>
+            </CardContent>
+          </Card>
+        </CardContent>
+      ) : (
+        <>
       <CardContent className="pt-4">
-        <div className="mb-4 p-4 bg-blue-50/50 rounded-md">
+            <div className="mb-4 p-4 bg-white border border-gray-200 rounded-md">
           <div className="flex items-start gap-2">
             <Lightbulb className="h-5 w-5 text-blue-600 mt-1 flex-shrink-0" />
             <div>
@@ -207,7 +235,7 @@ export function AILanguageAnalysisCard({ evaluation, expanded = false }: AILangu
                   </div>
                   
                   <div className="mt-4 space-y-2">
-                    <h4 className="text-sm font-medium">Coach Feedback:</h4>
+                        <h4 className="text-sm font-medium mb-2">Coach Feedback:</h4>
                     <div className="bg-white p-3 rounded-md border text-sm">
                       {selectedSkillDetails.explanation}
                     </div>
@@ -232,23 +260,9 @@ export function AILanguageAnalysisCard({ evaluation, expanded = false }: AILangu
             </div>
           </div>
         </div>
-        
-        <Button 
-          variant="ghost" 
-          onClick={() => setIsExpanded(!isExpanded)} 
-          className="w-full mt-6 text-sm"
-        >
-          {isExpanded ? (
-            <>
-              <ChevronUp className="h-4 w-4 mr-2" /> Show Less
-            </>
-          ) : (
-            <>
-              <ChevronDown className="h-4 w-4 mr-2" /> Show More
+          </CardContent>
             </>
           )}
-        </Button>
-      </CardContent>
     </Card>
   );
 }
@@ -261,7 +275,7 @@ function SkillListItem({ skill, isSelected, onClick }: { skill: any, isSelected:
   return (
     <div 
       className={`border rounded-lg p-3 cursor-pointer transition-all
-      ${isSelected ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}
+      ${isSelected ? 'border-blue-500 bg-white' : 'hover:bg-gray-50'}`}
       onClick={onClick}
     >
       <div className="flex justify-between items-center">

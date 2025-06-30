@@ -79,8 +79,8 @@ export function CoachFeedbackCard({
   };
 
   return (
-    <Card className="mb-6">
-      <CardHeader>
+    <Card className="mb-6 bg-white">
+      <CardHeader className="bg-white rounded-t-lg">
         <div className="flex justify-between items-center">
           <div className="flex items-center">
             <Avatar className="h-10 w-10 mr-3">

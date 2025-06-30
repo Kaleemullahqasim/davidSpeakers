@@ -36,10 +36,10 @@ export function OverviewDashboard({ evaluation, onToggleVideo }: OverviewDashboa
   return (
     <div className="space-y-6">
       <Card className="overflow-hidden">
-        <CardHeader className="bg-primary/5">
+        <CardHeader className="bg-white">
           <CardTitle className="flex justify-between items-center">
             <span>Evaluation Summary</span>
-            <Badge variant="outline" className="bg-primary/10">
+                          <Badge variant="outline" className="bg-white">
               Completed on {evaluationDate}
             </Badge>
           </CardTitle>

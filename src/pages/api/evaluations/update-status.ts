@@ -12,6 +12,7 @@ interface UpdateRequestBody {
   evaluationId: string;
   status: string;
   feedback?: string;
+  feedbackVideoUrl?: string; // Add feedback video URL
   manualScores?: any; // Add manual scores
   criticalSkills?: string[]; // Add critical skills
   adjustedScores?: any;
@@ -26,7 +27,7 @@ export default async function handler(
   }
 
   try {
-    const { evaluationId, status, feedback, manualScores, criticalSkills, adjustedScores } = req.body as UpdateRequestBody;
+    const { evaluationId, status, feedback, feedbackVideoUrl, manualScores, criticalSkills, adjustedScores } = req.body as UpdateRequestBody;
     
     console.log(`Update evaluation ${evaluationId} with:`, {
       status,
@@ -168,6 +169,12 @@ export default async function handler(
       }
       
       updateData.coach_feedback = feedback;
+      
+      // Add feedback video URL if provided
+      if (feedbackVideoUrl !== undefined) {
+        updateData.feedback_video_url = feedbackVideoUrl;
+      }
+      
       updateData.completed_at = new Date().toISOString();
     }
     

@@ -42,6 +42,7 @@ import {
 // Import the new component
 import { ManualScoresDisplay } from '@/components/student/ManualScoresDisplay';
 import { AILanguageAnalysisCard } from '@/components/student/AILanguageAnalysisCard';
+import { ManualSkillsAnalysisCard } from '@/components/student/ManualSkillsAnalysisCard';
 
 // Import the ParentClassSummary component
 import { ParentClassSummary } from '@/components/coach/ParentClassSummary';
@@ -111,12 +112,24 @@ function StudentEvaluationDetail() {
         return data;
       } catch (err) {
         console.error('Error fetching evaluation:', err);
-        // Distinguish between auth errors and other errors
-        if (err instanceof Error && 
-           (err.message.includes('Authentication') || 
+        
+        // Handle different types of errors
+        if (err instanceof Error) {
+          // Network or connection errors
+          if (err.message.includes('fetch failed') || err.message.includes('network')) {
+            setAuthError('Network connection error. Please check your internet connection and try again.');
+          }
+          // Auth errors
+          else if (err.message.includes('Authentication') || 
             err.message.includes('log in') || 
-            err.message.includes('token'))) {
-          setAuthError(err.message);
+                   err.message.includes('token') ||
+                   err.message.includes('expired')) {
+            setAuthError('Your session has expired. Please refresh the page and log in again.');
+          }
+          // Service unavailable
+          else if (err.message.includes('Service') || err.message.includes('503')) {
+            setAuthError('The service is temporarily unavailable. Please try again in a moment.');
+          }
         }
         throw err;
       }
@@ -230,7 +243,12 @@ function StudentEvaluationDetail() {
               </p>
               <div className="mt-6 space-y-2">
                 <Button 
-                  onClick={() => refetch()}
+                  onClick={() => {
+                    // Clear any cached auth errors
+                    setAuthError(null);
+                    // Force a refetch
+                    refetch();
+                  }}
                   className="w-full md:w-auto"
                 >
                   <RefreshCw className="mr-2 h-4 w-4" /> 
@@ -379,6 +397,9 @@ function StudentEvaluationDetail() {
             
             {/* Add AI Language Analysis Card to show Google Gemini API results */}
             <AILanguageAnalysisCard evaluation={evaluation} expanded={false} />
+            
+            {/* Add Manual Skills Analysis Card to show coach-scored skills */}
+            <ManualSkillsAnalysisCard evaluationId={id as string} expanded={false} />
             
             {/* Key strengths and areas for improvement - moved from Skills Analysis tab */}
             {hasCriticalSkills && (
