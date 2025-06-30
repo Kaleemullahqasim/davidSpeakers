@@ -14,7 +14,8 @@ import {
   User, 
   Award,
   Headphones,
-  Upload
+  Upload,
+  BarChart3
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -61,6 +62,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
           { href: '/dashboard/coach', label: 'Dashboard', icon: <Home className="h-5 w-5" /> },
           { href: '/dashboard/coach/evaluations', label: 'Evaluations', icon: <VideoIcon className="h-5 w-5" /> },
           { href: '/dashboard/coach/students', label: 'Students', icon: <Users className="h-5 w-5" /> },
+          { href: '/dashboard/coach/stats', label: 'Stats', icon: <BarChart3 className="h-5 w-5" /> },
           { href: '/dashboard/coach/resources', label: 'Resources', icon: <Book className="h-5 w-5" /> },
         ];
       case 'student':

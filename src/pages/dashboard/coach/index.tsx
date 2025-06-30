@@ -12,35 +12,19 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 
 import { 
-  BarChart, 
   CheckCircle, 
   ClipboardList, 
   Clock, 
   Calendar, 
-  ArrowUpRight,
   ArrowRight,
   Timer,
   UserRound,
-  Video,
-  Award,
   TrendingUp,
   MessageSquare,
   ExternalLink
 } from 'lucide-react';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  BarChart as RechartsBarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell
-} from 'recharts';
+import { StudentSearchSection } from '@/components/coach/StudentSearchSection';
+
 
 export default function CoachDashboard() {
   const { user, loading } = useAuth();
@@ -78,19 +62,7 @@ export default function CoachDashboard() {
     .sort((a, b) => new Date(b.completed_at || b.created_at).getTime() - new Date(a.completed_at || a.created_at).getTime())
     .slice(0, 5);
 
-  // Get the current day of the week (0 = Sunday, 1 = Monday, etc.)
-  const today = new Date().getDay();
-  
-  // Create a more realistic weekly completion data based on actual completed evaluations
-  const weeklyCompletionData = [
-    { name: 'Sun', count: completedEvaluations.filter((e: any) => new Date(e.completed_at || e.created_at).getDay() === 0).length || (today === 0 ? 1 : 0) },
-    { name: 'Mon', count: completedEvaluations.filter((e: any) => new Date(e.completed_at || e.created_at).getDay() === 1).length || (today === 1 ? 1 : 0) },
-    { name: 'Tue', count: completedEvaluations.filter((e: any) => new Date(e.completed_at || e.created_at).getDay() === 2).length || (today === 2 ? 2 : 0) },
-    { name: 'Wed', count: completedEvaluations.filter((e: any) => new Date(e.completed_at || e.created_at).getDay() === 3).length || (today === 3 ? 1 : 0) },
-    { name: 'Thu', count: completedEvaluations.filter((e: any) => new Date(e.completed_at || e.created_at).getDay() === 4).length || (today === 4 ? 3 : 0) },
-    { name: 'Fri', count: completedEvaluations.filter((e: any) => new Date(e.completed_at || e.created_at).getDay() === 5).length || (today === 5 ? 2 : 0) },
-    { name: 'Sat', count: completedEvaluations.filter((e: any) => new Date(e.completed_at || e.created_at).getDay() === 6).length || (today === 6 ? 1 : 0) },
-  ];
+
 
   // Stats for at-a-glance metrics with improved icons and dynamic counts
   const stats = [
@@ -126,12 +98,7 @@ export default function CoachDashboard() {
     }
   ];
 
-  // Distribution data for pie chart
-  const statusDistribution = [
-    { name: "Pending", value: pendingEvaluations.length || 1, color: "#3b82f6" },
-    { name: "In Progress", value: inProgressEvaluations.length || 1, color: "#f59e0b" },
-    { name: "Completed", value: completedEvaluations.length || 1, color: "#10b981" }
-  ];
+
 
   // Calculate average completion time (more realistic calculation based on evaluation data)
   const completionTimes = completedEvaluations
@@ -180,7 +147,14 @@ export default function CoachDashboard() {
               Welcome back, <span className="font-medium">{user.name || user.email}</span>. Here's your overview for {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}.
             </p>
           </div>
-          <div className="hidden md:block">
+          <div className="hidden md:flex md:gap-2">
+            <Button 
+              variant="outline"
+              onClick={() => router.push('/dashboard/coach/stats')}
+              className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+            >
+              View Stats
+            </Button>
             <Button 
               onClick={() => router.push('/dashboard/coach/evaluations')}
               className="bg-indigo-600 hover:bg-indigo-700"
@@ -224,104 +198,10 @@ export default function CoachDashboard() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Weekly Activity Chart */}
-          <Card className="lg:col-span-2 border-indigo-100">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center">
-                    <BarChart className="h-5 w-5 text-indigo-500 mr-2" />
-                    Weekly Review Activity
-                  </CardTitle>
-                  <CardDescription>Number of reviews completed per day</CardDescription>
-                </div>
-                <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">
-                  This Week
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[240px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsBarChart data={weeklyCompletionData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                    <YAxis allowDecimals={false} axisLine={false} tickLine={false} />
-                    <RechartsTooltip
-                      contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '6px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}
-                      cursor={{ fill: '#f3f4f6' }}
-                    />
-                    <Bar 
-                      dataKey="count" 
-                      fill="#4f46e5" 
-                      name="Reviews" 
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={50}
-                    />
-                  </RechartsBarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Distribution Pie Chart */}
-          <Card className="border-indigo-100">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center">
-                    <Award className="h-5 w-5 text-indigo-500 mr-2" />
-                    Status Breakdown
-                  </CardTitle>
-                  <CardDescription>Distribution by evaluation stage</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[220px] flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={statusDistribution}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                      // label={({name, value, percent}) => 
-                      //   value > 0 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''
-                      // }
-                      label={({ percent }) => 
-                        percent > 0 ? `${(percent * 100).toFixed(0)}%` : ''
-                      }
-                      labelLine={false}
-                    >
-                      {statusDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={entry.value === 0 ? 0 : 2} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip 
-                      contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '6px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}
-                      formatter={(value, name) => [`${value} ${value === 1 ? 'evaluation' : 'evaluations'}`, name]}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="mt-4 flex justify-center">
-                <div className="flex flex-wrap items-center justify-center gap-4">
-                  {statusDistribution.map((status, i) => (
-                    <div key={i} className="flex items-center gap-1">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: status.color }}></div>
-                      <span className="text-xs font-medium">{status.name}: {status.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+
+        {/* Student Search Section */}
+        <StudentSearchSection coachId={user.id} />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Work Queue Section */}
